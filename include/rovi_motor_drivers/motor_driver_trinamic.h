@@ -14,7 +14,7 @@
 namespace rovi_motor_drivers {
 
 
-    class motor_driver_trinamic : motor_driver {
+    class motor_driver_trinamic : motor_driver_velocity {
 
     private:
 
@@ -22,6 +22,7 @@ namespace rovi_motor_drivers {
         std::string device;
         serial::Serial *serialConnection;
 
+        // Device specific methods:
 
         /** Sends and receives data to/from TMCM1640.
          *  This function sends 9 bytes to the driver and reads the response which is also 9 bytes.
@@ -35,49 +36,6 @@ namespace rovi_motor_drivers {
 
         void constructCommand(int32_t value, uint8_t command, uint8_t type, std::vector<uint8_t> &commandToTransmit);
 
-
-    public:
-        motor_driver_trinamic();
-
-        motor_driver_trinamic(std::string dev);
-
-        ~motor_driver_trinamic();
-
-        // Required methods
-
-        /**
-         *
-         * @return The velocity of the motor in XYZ
-         */
-        double getVelocity(void) override;
-
-        /**
-         * Set the desired motor velocity
-         * @param v Desired velocity
-         */
-        void setVelocity(double v) override;
-
-        /**
-         *  Opens a serial port.
-         *  This function opens a serial port for the communication with the modul.
-         *  It parametrizes the serial port (Baudrate, parity bits....)
-         *  The address of the port is stored in the static variable serial.
-         */
-        bool open(void) override;
-
-        /**
-         * Closes the serial port.
-         */
-        bool close(void) override;
-
-        /**
-         * Stop the motor.
-         */
-        void stop(void) override;
-
-
-
-        // Additional device specific methods:
 
         /**
          * Set the name of the serial device (e.g. "/dev/ttyACM0)
@@ -295,13 +253,13 @@ namespace rovi_motor_drivers {
          *  @param p Parameter P
          *  @return status of the reply
          */
-        int setPIDParamPcurrent(int p);
+        int setParamPcurrent(int p);
 
         /** Reads the actual P parameter of current regulator.
          *  This function reads the actual P parameter of the PID current controller.
          *  @return P parameter
          */
-        int getPIDParamPcurrent();
+        int getParamPcurrent();
 
         /** Define I parameter of PID current controller.
          *  This function defines the I parameter of the PID current controller
@@ -314,7 +272,7 @@ namespace rovi_motor_drivers {
          *  This function reads the actual I parameter of the PID current controller.
          *  @return I parameter
          */
-        int getPIDParamIcurrent();
+        int getParamIcurrent();
 
         /** Define P parameter of PID position controller.
          *  This function defines the P parameter of the PID position controller
@@ -327,7 +285,7 @@ namespace rovi_motor_drivers {
          *  This function reads the actual P parameter of the PID position controller.
          *  @return P parameter
          */
-        int getPIDParamPposition();
+        int getParamPposition();
 
         /** Define P parameter of PID velocity controller.
          *  This function defines the P parameter of the PID velocity controller
@@ -340,7 +298,7 @@ namespace rovi_motor_drivers {
          *  This function reads the actual P parameter of the PID velocity controller.
          *  @return P parameter
          */
-        int getPIDParamPvelocity();
+        int getParamPvelocity();
 
         /** Define I parameter of PID velocity controller.
          *  This function defines the I parameter of the PID velocity controller
@@ -353,7 +311,7 @@ namespace rovi_motor_drivers {
          *  This function reads the actual I parameter of the PID velocity controller.
          *  @return I parameter
          */
-        int getPIDParamIvelocity();
+        int getParamIvelocity();
 
         /** Reads the actual signal from Hallsensors.
          *  This function reads the actual angle of the rotor depending on the Hall sensors. This command returns 6 different values (cycled).
@@ -361,6 +319,56 @@ namespace rovi_motor_drivers {
          *  @return rotor angle
          */
         int getHallAngle(void);
+
+
+
+
+    public:
+        motor_driver_trinamic();
+
+        motor_driver_trinamic(std::string name, std::string dev);
+
+        ~motor_driver_trinamic();
+
+        // Required methods
+
+        /**
+         *
+         * @return The velocity of the motor in XYZ
+         */
+        double getVelocity(void) override;
+
+        /**
+         * Set the desired motor velocity
+         * @param v Desired velocity
+         */
+        void setVelocity(double v) override;
+
+        /**
+         *  Opens a serial port.
+         *  This function opens a serial port for the communication with the modul.
+         *  It parametrizes the serial port (Baudrate, parity bits....)
+         *  The address of the port is stored in the static variable serial.
+         */
+        bool open(void) override;
+
+        /**
+         * Closes the serial port.
+         */
+        bool close(void) override;
+
+        /**
+         * Stop the motor.
+         */
+        void stop(void) override;
+
+        void setVelocityPID(cfgPID &cfg) override;
+
+        cfgPID getVelocityPID(void) override;
+
+        void setTorquePID(cfgPID &cfg);
+
+        cfgPID getTorquePID(void);
     };
 
 }
