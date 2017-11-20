@@ -5,13 +5,22 @@
 #ifndef ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_H
 #define ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_H
 
-class motor_driver {
+namespace rovi_motor_drivers {
 
-public:
-    virtual double getVelocity(void)=0;
-    virtual void setVelocity(double v)=0;
-    virtual bool open(void)=0;
-    virtual bool close(void)=0;
-};
+    class motor_driver {
+
+    public:
+
+        virtual double getVelocity(void)=0;
+
+        virtual void setVelocity(double v)=0;
+
+        virtual bool open(void)=0;
+
+        virtual bool close(void)=0;
+
+        virtual void stop(void)=0;
+    };
+}
 
 #endif //ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_H
