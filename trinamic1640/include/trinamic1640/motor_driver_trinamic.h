@@ -5,7 +5,7 @@
 #ifndef ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_TRINAMIC_H
 #define ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_TRINAMIC_H
 
-#include "rovi_motor_drivers/motor_driver.h"
+#include "rovi_motor_driver/motor_driver.h"
 #include <iostream>
 #include <ros/ros.h>
 #include <serial/serial.h>
@@ -362,11 +362,11 @@ namespace rovi_motor_drivers {
          */
         void stop(void) override;
 
-        void setVelocityPID(cfgPID &cfg) override;
+        bool setVelocityPID(cfgPID &cfg) override;
 
         cfgPID getVelocityPID(void) override;
 
-        void setTorquePID(cfgPID &cfg);
+        bool setTorquePID(cfgPID &cfg);
 
         cfgPID getTorquePID(void);
     };

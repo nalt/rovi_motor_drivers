@@ -2,7 +2,7 @@
 // Created by cschuwerk on 11/13/17.
 //
 
-#include "rovi_motor_drivers/motor_driver_trinamic.h"
+#include "trinamic1640/motor_driver_trinamic.h"
 
 namespace rovi_motor_drivers {
 
@@ -60,7 +60,7 @@ namespace rovi_motor_drivers {
 
     bool motor_driver_trinamic::close(void) {
 
-        this->stopMotor();
+        this->stop();
         if(serialConnection->isOpen()) {
             serialConnection->close();
         }
@@ -73,9 +73,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    void motor_driver_trinamic::setVelocityPID(cfgPID &cfg) {
-        this->setParamPvelocity((int) cfg.p);
-        this->setParamIvelocity((int) cfg.i);
+    bool motor_driver_trinamic::setVelocityPID(cfgPID &cfg) {
+        int status = 0;
+        status+= this->setParamPvelocity((int) cfg.p);
+        status+= this->setParamIvelocity((int) cfg.i);
+        if (status==200) return true;
+        return false;
     }
 
 
@@ -83,9 +86,12 @@ namespace rovi_motor_drivers {
         return cfgPID(this->getParamPvelocity(), this->getParamIvelocity(), 0.0);
     }
 
-    void motor_driver_trinamic::setTorquePID(cfgPID &cfg) {
-        this->setParamPcurrent((int) cfg.p);
-        this->setParamIcurrent((int) cfg.i);
+    bool motor_driver_trinamic::setTorquePID(cfgPID &cfg) {
+        int status = 0;
+        status+= this->setParamPcurrent((int) cfg.p);
+        status+= this->setParamIcurrent((int) cfg.i);
+        if (status==200) return true;
+        return false;
     }
 
     cfgPID motor_driver_trinamic::getTorquePID(void) {

@@ -28,13 +28,21 @@ namespace rovi_motor_drivers {
         virtual void stop(void)=0;
     };
 
+    class motor_driver_pwm : motor_driver {
+
+        virtual double getPWM(void)=0;
+
+        virtual void setPWM(double pwm)=0;
+
+    };
+
     class motor_driver_velocity : motor_driver {
 
         virtual double getVelocity(void)=0;
 
         virtual void setVelocity(double v)=0;
 
-        virtual void setVelocityPID(cfgPID &cfg)=0;
+        virtual bool setVelocityPID(cfgPID &cfg)=0;
 
         virtual cfgPID getVelocityPID(void)=0;
     };

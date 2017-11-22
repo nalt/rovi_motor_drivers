@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-    <name>rovi_motor_drivers</name>
+    <name>rovi_motor_driver</name>
     <version>0.0.0</version>
-    <description>The rovi_motor_drivers package</description>
+    <description>The rovi_motor_driver package</description>
 
     <!-- One maintainer tag required, multiple allowed, one person per tag -->
     <!-- Example:  -->
@@ -41,8 +41,8 @@
     <!--   <test_depend>gtest</test_depend> -->
     <buildtool_depend>catkin</buildtool_depend>
 
-    <build_depend>serial</build_depend>
-    <run_depend>serial</run_depend>
+    <!--build_depend>serial</build_depend-->
+    <!--run_depend>serial</run_depend-->
 
     <!-- The export tag contains other, unspecified, tags -->
     <export>

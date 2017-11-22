@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(rovi_motor_drivers)
+project(rovi_motor_driver)
 
 ## Add support for C++11, supported in ROS Kinetic and newer
 add_definitions(-std=c++11)
@@ -9,8 +9,7 @@ add_definitions(-std=c++11)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED
         roscpp
-        rospy
-        serial)
+        rospy)
 
 find_package(Boost REQUIRED COMPONENTS system)
 
@@ -36,8 +35,8 @@ find_package(Boost REQUIRED COMPONENTS system)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
         INCLUDE_DIRS include
-        LIBRARIES rovi_motor_drivers
-        CATKIN_DEPENDS serial
+        #LIBRARIES rovi_motor_driver
+        #CATKIN_DEPENDS serial
         #  DEPENDS system_lib
 )
 
@@ -53,9 +52,9 @@ include_directories(
 )
 
 ## Declare a C++ library
-add_library(${PROJECT_NAME}
-        src/${PROJECT_NAME}/motor_driver_trinamic.cpp
-        )
+#add_library(${PROJECT_NAME}
+#        src/${PROJECT_NAME}/motor_driver_trinamic.cpp
+#        )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -65,7 +64,7 @@ add_library(${PROJECT_NAME}
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/rovi_visual_motor_control_node.cpp include/${PROJECT_NAME}/motor_driver.h src/${PROJECT_NAME}/motor_driver_trinamic.cpp include/${PROJECT_NAME}/motor_driver_trinamic.h)
+#add_executable(${PROJECT_NAME}_node src/rovi_visual_motor_control_node.cpp include/${PROJECT_NAME}/motor_driver.h src/${PROJECT_NAME}/motor_driver_trinamic.cpp include/${PROJECT_NAME}/motor_driver_trinamic.h)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -78,10 +77,10 @@ add_executable(${PROJECT_NAME}_node src/rovi_visual_motor_control_node.cpp inclu
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_node
-        ${catkin_LIBRARIES}
-        ${Boost_LIBRARIES}
-        )
+#target_link_libraries(${PROJECT_NAME}_node
+#        ${catkin_LIBRARIES}
+#        ${Boost_LIBRARIES}
+#        )
 
 #############
 ## Install ##

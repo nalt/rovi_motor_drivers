@@ -2,14 +2,15 @@
 // Created by cschuwerk on 11/13/17.
 //
 
-#include "rovi_motor_drivers/motor_driver_trinamic.h"
+#include "trinamic1640/motor_driver_trinamic.h"
 #include <iostream>
+
 
 int main(int argc, char** argv)
 {
 
-    rovi_motor_drivers::motor_driver_trinamic trinamic_driver = rovi_motor_drivers::motor_driver_trinamic("driver_trinamic", "/dev/robot/ttyTrinamic1640");
 
+    rovi_motor_drivers::motor_driver_trinamic trinamic_driver("driver_trinamic", "/dev/robot/ttyTrinamic1640");
     trinamic_driver.open();
 
 
@@ -32,6 +33,12 @@ int main(int argc, char** argv)
     //std::cout << "setStartCurrent method: " << trinamic_driver.setStartCurrent(100) << std::endl;
 
     //std::cout << "setVelocity method: " <<  << std::endl;
+    rovi_motor_drivers::cfgPID cfg(100,0,0);
+
+    std::cout << "setStartCurrent method: " << trinamic_driver.setVelocityPID(cfg) << std::endl;
+
+    rovi_motor_drivers::cfgPID cfg2;
+    cfg2 =  trinamic_driver.getVelocityPID();
 
     std::cout << "Start: ";
     trinamic_driver.setVelocity(300.0);
