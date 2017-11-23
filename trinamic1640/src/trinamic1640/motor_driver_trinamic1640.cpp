@@ -2,46 +2,47 @@
 // Created by cschuwerk on 11/13/17.
 //
 
-#include "trinamic1640/motor_driver_trinamic.h"
+#include "trinamic1640/motor_driver_trinamic1640.h"
 
 namespace rovi_motor_drivers {
 
-    motor_driver_trinamic::motor_driver_trinamic() : device("/dev/ttyACM0") {
+    motor_driver_trinamic1640::motor_driver_trinamic1640()  {
         this->serialConnection = NULL;
     }
 
 
-    motor_driver_trinamic::motor_driver_trinamic(std::string name, std::string dev) : device(dev), name(name){
+    motor_driver_trinamic1640::motor_driver_trinamic1640(std::string name, trinamic1640_config &cfg) : name(name), cfg(cfg) {
         this->serialConnection = NULL;
     }
 
-    motor_driver_trinamic::~motor_driver_trinamic() {
+    motor_driver_trinamic1640::~motor_driver_trinamic1640() {
         this->stop();
         this->close();
+        ROS_INFO_STREAM_NAMED(this->name, "Trinamic driver shutdown: " << this->cfg.device);
     }
 
 
-    void motor_driver_trinamic::setDevice(std::string dev) {
-        this->device = dev;
+    void motor_driver_trinamic1640::setDevice(std::string dev) {
+        this->cfg.device = dev;
     }
 
 
-    double motor_driver_trinamic::getVelocity() {
+    double motor_driver_trinamic1640::getVelocity() {
         return 0;
     }
 
 
-    void motor_driver_trinamic::setVelocity(double v) {
+    void motor_driver_trinamic1640::setVelocity(double v) {
         this->setTargetVelocity((int) v);
     }
 
 
-    bool motor_driver_trinamic::open(void) {
+    bool motor_driver_trinamic1640::open(void) {
 
         try {
             this->serialConnection = new serial::Serial();
-            serialConnection->setPort(this->device);
-            serialConnection->setBaudrate(115200);
+            serialConnection->setPort(this->cfg.device);
+            serialConnection->setBaudrate(this->cfg.baudrate);
             serial::Timeout timeout = serial::Timeout::simpleTimeout(1000);
             serialConnection->setTimeout(timeout);
             serialConnection->open();
@@ -58,7 +59,7 @@ namespace rovi_motor_drivers {
     }
 
 
-    bool motor_driver_trinamic::close(void) {
+    bool motor_driver_trinamic1640::close(void) {
 
         this->stop();
         if(serialConnection->isOpen()) {
@@ -68,12 +69,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    void motor_driver_trinamic::stop(void) {
+    void motor_driver_trinamic1640::stop(void) {
         this->stopMotor();
     }
 
 
-    bool motor_driver_trinamic::setVelocityPID(cfgPID &cfg) {
+    bool motor_driver_trinamic1640::setVelocityPID(cfgPID &cfg) {
         int status = 0;
         status+= this->setParamPvelocity((int) cfg.p);
         status+= this->setParamIvelocity((int) cfg.i);
@@ -82,11 +83,11 @@ namespace rovi_motor_drivers {
     }
 
 
-    cfgPID motor_driver_trinamic::getVelocityPID(void) {
+    cfgPID motor_driver_trinamic1640::getVelocityPID(void) {
         return cfgPID(this->getParamPvelocity(), this->getParamIvelocity(), 0.0);
     }
 
-    bool motor_driver_trinamic::setTorquePID(cfgPID &cfg) {
+    bool motor_driver_trinamic1640::setTorquePID(cfgPID &cfg) {
         int status = 0;
         status+= this->setParamPcurrent((int) cfg.p);
         status+= this->setParamIcurrent((int) cfg.i);
@@ -94,7 +95,7 @@ namespace rovi_motor_drivers {
         return false;
     }
 
-    cfgPID motor_driver_trinamic::getTorquePID(void) {
+    cfgPID motor_driver_trinamic1640::getTorquePID(void) {
         return cfgPID(this->getParamPcurrent(), this->getParamIcurrent(), 0.0);
     }
 
@@ -102,7 +103,7 @@ namespace rovi_motor_drivers {
 
 
 
-    int motor_driver_trinamic::SendReceiveData(int32_t value, uint8_t command, uint8_t type, uint8_t readtype) {
+    int motor_driver_trinamic1640::SendReceiveData(int32_t value, uint8_t command, uint8_t type, uint8_t readtype) {
 
         std::vector<uint8_t> writeData(9);
         std::vector<uint8_t> readData;
@@ -143,7 +144,7 @@ namespace rovi_motor_drivers {
     }
 
 
-    void motor_driver_trinamic::constructCommand(int32_t value, uint8_t command, uint8_t type,
+    void motor_driver_trinamic1640::constructCommand(int32_t value, uint8_t command, uint8_t type,
                                                  std::vector<uint8_t> &commandToTransmit) {
 
         commandToTransmit[0] = 1;
@@ -163,12 +164,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getMaxCurrent() {
+    int motor_driver_trinamic1640::getMaxCurrent() {
         return SendReceiveData(0, 6, 6, 10);
     }
 
 
-    int motor_driver_trinamic::setMaxCurrent(int current) {
+    int motor_driver_trinamic1640::setMaxCurrent(int current) {
         int status = SendReceiveData(current, 5, 6, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 6, 0);
@@ -177,17 +178,17 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::setStartCurrent(int current) {
+    int motor_driver_trinamic1640::setStartCurrent(int current) {
         return SendReceiveData(current, 5, 177, 0);
     }
 
 
-    int motor_driver_trinamic::getStartCurrent() {
+    int motor_driver_trinamic1640::getStartCurrent() {
         return SendReceiveData(0, 6, 177, 10);
     }
 
 
-    int motor_driver_trinamic::setCommutationMethod(int method) {
+    int motor_driver_trinamic1640::setCommutationMethod(int method) {
         int status = SendReceiveData(method, 5, 159, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 159, 0);
@@ -196,12 +197,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getCommutationMethod() {
+    int motor_driver_trinamic1640::getCommutationMethod() {
         return SendReceiveData(0, 6, 159, 10);
     }
 
 
-    int motor_driver_trinamic::setMotorPoleNum(int poles) {
+    int motor_driver_trinamic1640::setMotorPoleNum(int poles) {
         int status = SendReceiveData(poles, 5, 253, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 253, 0);
@@ -210,12 +211,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getMotorPoleNum() {
+    int motor_driver_trinamic1640::getMotorPoleNum() {
         return SendReceiveData(0, 6, 253, 10);
     }
 
 
-    int motor_driver_trinamic::setMaxVelocity(int velocity) {
+    int motor_driver_trinamic1640::setMaxVelocity(int velocity) {
         int status = SendReceiveData(velocity, 5, 4, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 4, 0);
@@ -224,12 +225,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getMaxVelocity() {
+    int motor_driver_trinamic1640::getMaxVelocity() {
         return SendReceiveData(0, 6, 4, 10);
     }
 
 
-    int motor_driver_trinamic::setAcceleration(int acceleration) {
+    int motor_driver_trinamic1640::setAcceleration(int acceleration) {
         int status = SendReceiveData(acceleration, 5, 11, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 11, 0);
@@ -238,27 +239,27 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getAcceleration() {
+    int motor_driver_trinamic1640::getAcceleration() {
         return SendReceiveData(0, 6, 11, 10);
     }
 
 
-    int motor_driver_trinamic::stopMotor() {
+    int motor_driver_trinamic1640::stopMotor() {
         return SendReceiveData(0, 3, 0, 0);
     }
 
 
-    int motor_driver_trinamic::rotateRight(int velocity) {
+    int motor_driver_trinamic1640::rotateRight(int velocity) {
         return SendReceiveData(velocity, 1, 0, 0);
     }
 
 
-    int motor_driver_trinamic::rotateLeft(int velocity) {
+    int motor_driver_trinamic1640::rotateLeft(int velocity) {
         return SendReceiveData(velocity, 2, 0, 0);
     }
 
 
-    int motor_driver_trinamic::moveToPosition(int position) {
+    int motor_driver_trinamic1640::moveToPosition(int position) {
         int status;
         int positionNew;
 
@@ -269,7 +270,7 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::setTargetPos(int position) {
+    int motor_driver_trinamic1640::setTargetPos(int position) {
         int status;
         int positionNew;
 
@@ -280,7 +281,7 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::setActualPos(int position) {
+    int motor_driver_trinamic1640::setActualPos(int position) {
         int status;
         int positionNew;
 
@@ -290,22 +291,22 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::setTargetVelocity(int velocity) {
+    int motor_driver_trinamic1640::setTargetVelocity(int velocity) {
         return SendReceiveData(velocity, 5, 2, 0);
     }
 
 
-    int motor_driver_trinamic::setTargetMotorCurrent(int current) {
+    int motor_driver_trinamic1640::setTargetMotorCurrent(int current) {
         return SendReceiveData(current, 5, 155, 0);
     }
 
 
-    int motor_driver_trinamic::getTargetPosition() {
+    int motor_driver_trinamic1640::getTargetPosition() {
         return SendReceiveData(0, 6, 0, 10);
     }
 
 
-    double motor_driver_trinamic::getActualPosition() {
+    double motor_driver_trinamic1640::getActualPosition() {
         int position;
         double position_Grad;
         position = SendReceiveData(0, 6, 1, 10);
@@ -314,27 +315,27 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getTargetVelocity() {
+    int motor_driver_trinamic1640::getTargetVelocity() {
         return SendReceiveData(0, 6, 2, 10);
     }
 
 
-    int motor_driver_trinamic::getActualVelocity() {
+    int motor_driver_trinamic1640::getActualVelocity() {
         return SendReceiveData(0, 6, 3, 10);
     }
 
 
-    int motor_driver_trinamic::getActualMotorCurrent() {
+    int motor_driver_trinamic1640::getActualMotorCurrent() {
         return SendReceiveData(0, 6, 150, 10);
     }
 
 
-    int motor_driver_trinamic::getTargetMotorCurrent() {
+    int motor_driver_trinamic1640::getTargetMotorCurrent() {
         return SendReceiveData(0, 6, 155, 10);
     }
 
 
-    int motor_driver_trinamic::setPIDdelayPosVel(int delay) {
+    int motor_driver_trinamic1640::setPIDdelayPosVel(int delay) {
         int status = SendReceiveData(delay, 5, 133, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 133, 0);
@@ -343,12 +344,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getPIDdelayPosVel() {
+    int motor_driver_trinamic1640::getPIDdelayPosVel() {
         return SendReceiveData(0, 6, 133, 10);
     }
 
 
-    int motor_driver_trinamic::setPIDdelayCurrent(int delay) {
+    int motor_driver_trinamic1640::setPIDdelayCurrent(int delay) {
         int status = SendReceiveData(delay, 5, 134, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 134, 0);
@@ -357,13 +358,13 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getPIDdelayCurrent() {
+    int motor_driver_trinamic1640::getPIDdelayCurrent() {
         int delay = SendReceiveData(0, 6, 134, 10);
         return delay;
     }
 
 
-    int motor_driver_trinamic::setParamPcurrent(int p) {
+    int motor_driver_trinamic1640::setParamPcurrent(int p) {
         int status = SendReceiveData(p, 5, 172, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 172, 0);
@@ -372,12 +373,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getParamPcurrent() {
+    int motor_driver_trinamic1640::getParamPcurrent() {
         return SendReceiveData(0, 6, 172, 10);
     }
 
 
-    int motor_driver_trinamic::setParamIcurrent(int I) {
+    int motor_driver_trinamic1640::setParamIcurrent(int I) {
         int status = SendReceiveData(I, 5, 173, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 173, 0);
@@ -386,12 +387,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getParamIcurrent() {
+    int motor_driver_trinamic1640::getParamIcurrent() {
         return SendReceiveData(0, 6, 173, 10);
     }
 
 
-    int motor_driver_trinamic::setParamPposition(int p) {
+    int motor_driver_trinamic1640::setParamPposition(int p) {
         int status = SendReceiveData(p, 5, 230, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 230, 0);
@@ -400,12 +401,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getParamPposition() {
+    int motor_driver_trinamic1640::getParamPposition() {
         return SendReceiveData(0, 6, 230, 10);
     }
 
 
-    int motor_driver_trinamic::setParamPvelocity(int p) {
+    int motor_driver_trinamic1640::setParamPvelocity(int p) {
         int status = SendReceiveData(p, 5, 234, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 234, 0);
@@ -414,12 +415,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getParamPvelocity() {
+    int motor_driver_trinamic1640::getParamPvelocity() {
         return SendReceiveData(0, 6, 234, 10);
     }
 
 
-    int motor_driver_trinamic::setParamIvelocity(int I) {
+    int motor_driver_trinamic1640::setParamIvelocity(int I) {
         int status = SendReceiveData(I, 5, 235, 0);
         if (status == 100) {
             status = SendReceiveData(0, 7, 235, 0);
@@ -428,12 +429,12 @@ namespace rovi_motor_drivers {
     }
 
 
-    int motor_driver_trinamic::getParamIvelocity() {
+    int motor_driver_trinamic1640::getParamIvelocity() {
         return SendReceiveData(0, 6, 235, 10);
     }
 
 
-    int motor_driver_trinamic::getHallAngle() {
+    int motor_driver_trinamic1640::getHallAngle() {
         return SendReceiveData(0, 6, 210, 10);
     }
 

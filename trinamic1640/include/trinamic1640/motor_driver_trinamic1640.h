@@ -13,13 +13,70 @@
 
 namespace rovi_motor_drivers {
 
+    struct trinamic1640_config {
+        std::string device = "/dev/ttyACM0";
+        int baudrate = 115200;
+    };
 
-    class motor_driver_trinamic : motor_driver_velocity {
+
+    class motor_driver_trinamic1640 : public motor_driver_velocity {
+
+
+    public:
+        motor_driver_trinamic1640();
+
+        motor_driver_trinamic1640(std::string name, trinamic1640_config &cfg);
+
+        ~motor_driver_trinamic1640();
+
+        // Required methods
+
+        /**
+         *
+         * @return The velocity of the motor in XYZ
+         */
+        double getVelocity(void) override;
+
+        /**
+         * Set the desired motor velocity
+         * @param v Desired velocity
+         */
+        void setVelocity(double v) override;
+
+        /**
+         *  Opens a serial port.
+         *  This function opens a serial port for the communication with the modul.
+         *  It parametrizes the serial port (Baudrate, parity bits....)
+         *  The address of the port is stored in the static variable serial.
+         */
+        bool open(void) override;
+
+        /**
+         * Closes the serial port.
+         */
+        bool close(void) override;
+
+        /**
+         * Stop the motor.
+         */
+        void stop(void) override;
+
+        bool setVelocityPID(cfgPID &cfg) override;
+
+        cfgPID getVelocityPID(void) override;
+
+        bool setTorquePID(cfgPID &cfg);
+
+        cfgPID getTorquePID(void);
+
+
+
+
 
     private:
 
-        std::string name = "motor_driver_trinamic";
-        std::string device;
+        std::string name = "motor_driver_trinamic1640";
+        trinamic1640_config cfg;
         serial::Serial *serialConnection;
 
         // Device specific methods:
@@ -320,55 +377,6 @@ namespace rovi_motor_drivers {
          */
         int getHallAngle(void);
 
-
-
-
-    public:
-        motor_driver_trinamic();
-
-        motor_driver_trinamic(std::string name, std::string dev);
-
-        ~motor_driver_trinamic();
-
-        // Required methods
-
-        /**
-         *
-         * @return The velocity of the motor in XYZ
-         */
-        double getVelocity(void) override;
-
-        /**
-         * Set the desired motor velocity
-         * @param v Desired velocity
-         */
-        void setVelocity(double v) override;
-
-        /**
-         *  Opens a serial port.
-         *  This function opens a serial port for the communication with the modul.
-         *  It parametrizes the serial port (Baudrate, parity bits....)
-         *  The address of the port is stored in the static variable serial.
-         */
-        bool open(void) override;
-
-        /**
-         * Closes the serial port.
-         */
-        bool close(void) override;
-
-        /**
-         * Stop the motor.
-         */
-        void stop(void) override;
-
-        bool setVelocityPID(cfgPID &cfg) override;
-
-        cfgPID getVelocityPID(void) override;
-
-        bool setTorquePID(cfgPID &cfg);
-
-        cfgPID getTorquePID(void);
     };
 
 }

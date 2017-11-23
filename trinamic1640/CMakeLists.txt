@@ -58,7 +58,7 @@ include_directories(
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
-        src/${PROJECT_NAME}/motor_driver_trinamic.cpp
+        src/${PROJECT_NAME}/motor_driver_trinamic1640.cpp
         )
 
 ## Add cmake target dependencies of the library
@@ -69,7 +69,7 @@ add_library(${PROJECT_NAME}
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/rovi_visual_motor_control_node.cpp src/${PROJECT_NAME}/motor_driver_trinamic.cpp include/${PROJECT_NAME}/motor_driver_trinamic.h)
+add_executable(${PROJECT_NAME}_node src/rovi_visual_motor_control_node.cpp src/${PROJECT_NAME}/motor_driver_trinamic1640.cpp include/${PROJECT_NAME}/motor_driver_trinamic1640.h)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

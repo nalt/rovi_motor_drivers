@@ -26,9 +26,12 @@ namespace rovi_motor_drivers {
         virtual bool close(void)=0;
 
         virtual void stop(void)=0;
+
+    private:
+        bool isOpen = false;
     };
 
-    class motor_driver_pwm : motor_driver {
+    class motor_driver_pwm : public motor_driver {
 
         virtual double getPWM(void)=0;
 
@@ -36,7 +39,7 @@ namespace rovi_motor_drivers {
 
     };
 
-    class motor_driver_velocity : motor_driver {
+    class motor_driver_velocity : public motor_driver {
 
         virtual double getVelocity(void)=0;
 

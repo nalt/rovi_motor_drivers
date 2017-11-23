@@ -23,6 +23,7 @@ namespace rovi_motor_drivers {
     motor_driver_roboclaw::~motor_driver_roboclaw() {
         this->stop();
         this->close();
+        ROS_INFO_STREAM_NAMED(this->name, "Roboclaw driver shutdown: " << this->cfg.device);
     }
 
     bool motor_driver_roboclaw::open(void) {

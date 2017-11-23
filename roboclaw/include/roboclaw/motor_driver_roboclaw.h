@@ -2,8 +2,8 @@
 // Created by cschuwerk on 11/13/17.
 //
 
-#ifndef ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_TRINAMIC_H
-#define ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_TRINAMIC_H
+#ifndef ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_ROBOCLAW_H
+#define ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_ROBOCLAW_H
 
 #include "rovi_motor_driver/motor_driver.h"
 #include <iostream>
@@ -16,10 +16,10 @@ namespace rovi_motor_drivers {
 
     struct roboclaw_config {
         std::string device = "/dev/ttyACM0";
-        unsigned int address = 128;
-        unsigned int motor = 1;
-        unsigned int qpps = 1000;
-        unsigned int baudrate = 115200;
+        int address = 128;
+        int motor = 1;
+        int qpps = 1000;
+        int baudrate = 115200;
     };
 
     struct roboclaw_commands {
@@ -251,4 +251,4 @@ namespace rovi_motor_drivers {
 }
 
 
-#endif //ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_TRINAMIC_H
+#endif //ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_ROBOCLAW_H
