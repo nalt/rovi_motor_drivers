@@ -13,7 +13,7 @@
 
 namespace rovi_motor_drivers {
 
-    struct trinamic1640_config {
+    struct config_trinamic1640 {
         std::string device = "/dev/ttyACM0";
         int baudrate = 115200;
     };
@@ -25,7 +25,7 @@ namespace rovi_motor_drivers {
     public:
         motor_driver_trinamic1640();
 
-        motor_driver_trinamic1640(std::string name, trinamic1640_config &cfg);
+        motor_driver_trinamic1640(std::string name, config_trinamic1640 &cfg);
 
         ~motor_driver_trinamic1640();
 
@@ -76,7 +76,7 @@ namespace rovi_motor_drivers {
     private:
 
         std::string name = "motor_driver_trinamic1640";
-        trinamic1640_config cfg;
+        config_trinamic1640 cfg;
         serial::Serial *serialConnection;
 
         // Device specific methods:

@@ -14,7 +14,7 @@
 
 namespace rovi_motor_drivers {
 
-    struct roboclaw_config {
+    struct config_roboclaw {
         std::string device = "/dev/ttyACM0";
         int address = 128;
         int motor = 1;
@@ -22,7 +22,7 @@ namespace rovi_motor_drivers {
         int baudrate = 115200;
     };
 
-    struct roboclaw_commands {
+    struct commands_roboclaw {
         static const int M1FORWARD = 0;
         static const int M1BACKWARD = 1;
         static const int SETMINMB = 2;
@@ -171,7 +171,7 @@ namespace rovi_motor_drivers {
     public:
         motor_driver_roboclaw();
 
-        motor_driver_roboclaw(std::string name, roboclaw_config &cfg);
+        motor_driver_roboclaw(std::string name, config_roboclaw &cfg);
 
         ~motor_driver_roboclaw();
 
@@ -220,9 +220,9 @@ namespace rovi_motor_drivers {
         cfgPID getVelocityPID(void) override;
 
 
-        inline void setConfig(roboclaw_config &cfg) { this->cfg = cfg; }
+        inline void setConfig(config_roboclaw &cfg) { this->cfg = cfg; }
 
-        inline roboclaw_config getConfig(void) { return this->cfg; }
+        inline config_roboclaw getConfig(void) { return this->cfg; }
 
 
 
@@ -233,7 +233,7 @@ namespace rovi_motor_drivers {
     private:
 
         std::string name = "motor_driver_roboclaw";
-        roboclaw_config cfg;
+        config_roboclaw cfg;
         serial::Serial *serialConnection;
 
 

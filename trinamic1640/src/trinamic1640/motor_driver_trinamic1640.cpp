@@ -11,7 +11,7 @@ namespace rovi_motor_drivers {
     }
 
 
-    motor_driver_trinamic1640::motor_driver_trinamic1640(std::string name, trinamic1640_config &cfg) : name(name), cfg(cfg) {
+    motor_driver_trinamic1640::motor_driver_trinamic1640(std::string name, config_trinamic1640 &cfg) : name(name), cfg(cfg) {
         this->serialConnection = NULL;
     }
 

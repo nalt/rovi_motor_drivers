@@ -10,7 +10,7 @@
 int main(int argc, char** argv)
 {
 
-    rovi_motor_drivers::trinamic1640_config cfg;
+    rovi_motor_drivers::config_trinamic1640 cfg;
     cfg.device = "/dev/robot/ttyTrinamic1640";
 
     rovi_motor_drivers::motor_driver_trinamic1640 trinamic_driver("driver_trinamic", cfg);
@@ -19,7 +19,7 @@ int main(int argc, char** argv)
     //rovi_motor_drivers::motor_driver_trinamic1640* trinamic_driver= new rovi_motor_drivers::motor_driver_trinamic1640("driver_trinamic", "/dev/robot/ttyTrinamic1640");
     //trinamic_driver->open();
 
-    //boost::scoped_ptr<rovi_motor_drivers::motor_driver_trinamic1640> ptr(new rovi_motor_drivers::motor_driver_trinamic1640("driver_trinamic", trinamic1640_config()));
+    //boost::scoped_ptr<rovi_motor_drivers::motor_driver_trinamic1640> ptr(new rovi_motor_drivers::motor_driver_trinamic1640("driver_trinamic", config_trinamic1640()));
     //ptr->open();
 
 

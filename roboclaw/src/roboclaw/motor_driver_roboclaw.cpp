@@ -9,12 +9,12 @@
 namespace rovi_motor_drivers {
 
 
-    motor_driver_roboclaw::motor_driver_roboclaw() : cfg(roboclaw_config()) {
+    motor_driver_roboclaw::motor_driver_roboclaw() : cfg(config_roboclaw()) {
         this->serialConnection = NULL;
     }
 
 
-    motor_driver_roboclaw::motor_driver_roboclaw(std::string name, roboclaw_config &cfg)
+    motor_driver_roboclaw::motor_driver_roboclaw(std::string name, config_roboclaw &cfg)
             : cfg(cfg) {
         this->serialConnection = NULL;
     }
@@ -35,7 +35,7 @@ namespace rovi_motor_drivers {
             serial::Timeout timeout = serial::Timeout::simpleTimeout(1000);
             serialConnection->setTimeout(timeout);
             serialConnection->open();
-            ROS_INFO_STREAM_NAMED(this->name, "Serial port opened successfully.");
+            ROS_INFO_STREAM_NAMED(this->name, "Serial port opened successfully: " << this->cfg.device << " (" << this->cfg.address << ")");
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "Serial Error: Failed to open serial port: " << e.what());
             return false;
@@ -57,9 +57,9 @@ namespace rovi_motor_drivers {
         writeb[0]=this->cfg.address;
 
         if(this->cfg.motor == 2) {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::GETM2SPEED; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::GETM2SPEED; }
         else {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::GETM1SPEED; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::GETM1SPEED; }
 
         this->serialConnection->write(writeb,2);
 
@@ -79,9 +79,9 @@ namespace rovi_motor_drivers {
         unsigned char writeb[8];
         writeb[0]=this->cfg.address;
         if(this->cfg.motor == 2) {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::M2SPEED; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::M2SPEED; }
         else {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::M1SPEED; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::M1SPEED; }
         writeb[2]=speed>>24;
         writeb[3]=speed>>16;
         writeb[4]=speed>>8;
@@ -128,9 +128,9 @@ namespace rovi_motor_drivers {
         writeb[0]=this->cfg.address;
 
         if(this->cfg.motor == 2) {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::SETM2PID; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::SETM2PID; }
         else {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::SETM1PID; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::SETM1PID; }
 
         writeb[2]=D>>24;
         writeb[3]=D>>16;
@@ -174,9 +174,9 @@ namespace rovi_motor_drivers {
         writeb[0]=this->cfg.address;
 
         if(this->cfg.motor == 2) {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::READM2PID; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::READM2PID; }
         else {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::READM1PID; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::READM1PID; }
 
         this->serialConnection->write(writeb,2);
 
@@ -201,9 +201,9 @@ namespace rovi_motor_drivers {
 
 
         if(this->cfg.motor == 2) {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::M2DUTY; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::M2DUTY; }
         else {
-            writeb[1]=rovi_motor_drivers::roboclaw_commands::M1DUTY; }
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::M1DUTY; }
 
         writeb[0]=this->cfg.address;
         writeb[2]=pwmvalue>>8;
@@ -231,7 +231,7 @@ namespace rovi_motor_drivers {
         short value = 0;
 
         writeb[0]=this->cfg.address;
-        writeb[1]=rovi_motor_drivers::roboclaw_commands::GETPWMS;
+        writeb[1]=rovi_motor_drivers::commands_roboclaw::GETPWMS;
 
         this->serialConnection->write(writeb,2);
 

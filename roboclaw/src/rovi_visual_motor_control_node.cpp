@@ -10,7 +10,7 @@
 int main(int argc, char** argv)
 {
 
-    rovi_motor_drivers::roboclaw_config cfg;
+    rovi_motor_drivers::config_roboclaw cfg;
     cfg.device = "/dev/ttyACM2";
     cfg.motor = 1;
     cfg.address = 129;
