@@ -20,6 +20,7 @@ namespace rovi_motor_drivers {
         int motor = 1;
         int qpps = 1000;
         int baudrate = 115200;
+        int timeout = 100;
     };
 
     struct commands_roboclaw {
@@ -226,7 +227,7 @@ namespace rovi_motor_drivers {
 
 
 
-
+        std::shared_ptr<serial::Serial> serialConnection;
 
 
 
@@ -234,7 +235,7 @@ namespace rovi_motor_drivers {
 
         std::string name = "motor_driver_roboclaw";
         config_roboclaw cfg;
-        serial::Serial *serialConnection;
+
 
 
         /**

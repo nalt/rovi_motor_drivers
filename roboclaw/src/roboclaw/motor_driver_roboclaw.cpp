@@ -24,15 +24,16 @@ namespace rovi_motor_drivers {
         this->stop();
         this->close();
         ROS_INFO_STREAM_NAMED(this->name, "Roboclaw driver shutdown: " << this->cfg.device);
+        std::cout << "~motor_driver_roboclaw";
     }
 
     bool motor_driver_roboclaw::open(void) {
 
         try {
-            this->serialConnection = new serial::Serial();
+            this->serialConnection = std::shared_ptr<serial::Serial>(new serial::Serial);
             serialConnection->setPort(this->cfg.device);
             serialConnection->setBaudrate(this->cfg.baudrate);
-            serial::Timeout timeout = serial::Timeout::simpleTimeout(1000);
+            serial::Timeout timeout = serial::Timeout::simpleTimeout(cfg.timeout);
             serialConnection->setTimeout(timeout);
             serialConnection->open();
             ROS_INFO_STREAM_NAMED(this->name, "Serial port opened successfully: " << this->cfg.device << " (" << this->cfg.address << ")");
@@ -41,7 +42,6 @@ namespace rovi_motor_drivers {
             return false;
         }
 
-        // Init the driver
 
         return true;
 
@@ -112,7 +112,8 @@ namespace rovi_motor_drivers {
 
 
     void motor_driver_roboclaw::stop(void) {
-        // TODO: Implement
+
+        std::cout << "stop";
         this->setPWM(0.0);
     }
 
@@ -169,7 +170,6 @@ namespace rovi_motor_drivers {
 
     cfgPID motor_driver_roboclaw::getVelocityPID(void) {
 
-
         unsigned char writeb[2];
         writeb[0]=this->cfg.address;
 
@@ -199,7 +199,6 @@ namespace rovi_motor_drivers {
         unsigned char writeb[6];
         short pwmvalue = (short) (pwm * 32767.0);
 
-
         if(this->cfg.motor == 2) {
             writeb[1]=rovi_motor_drivers::commands_roboclaw::M2DUTY; }
         else {
@@ -214,28 +213,43 @@ namespace rovi_motor_drivers {
         writeb[4]=(checksum >> 8);
         writeb[5]=checksum & 0xff;
 
-        this->serialConnection->write(writeb,6);
-
         unsigned char readb;
-        this->serialConnection->read(&readb,1);
+
+        try {
+            this->serialConnection->write(writeb,6);
+            this->serialConnection->read(&readb,1);
+        }
+        catch (const std::exception& e) {
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication getPWM " << e.what());
+        }
+
+
         //return readb;
 
     }
 
-    // DOES NOT WORK
+
     double motor_driver_roboclaw::getPWM(void) {
 
+
         unsigned char writeb[2];
-        //uint8_t readb[6];
         std::vector<uint8_t> readb;
         short value = 0;
-
         writeb[0]=this->cfg.address;
         writeb[1]=rovi_motor_drivers::commands_roboclaw::GETPWMS;
 
-        this->serialConnection->write(writeb,2);
+        try {
+            this->serialConnection->write(writeb,2);
+            this->serialConnection->read(readb,6);
+        }
+        catch (const std::exception& e) {
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication getPWM " << e.what());
+        }
 
-        this->serialConnection->read(readb,6);
+        if(readb.size() != 6) {
+            ROS_INFO_STREAM("Serial packet with unexpected length received: " << readb.size());
+            return 0.0;
+        }
 
         if(this->cfg.motor == 2) {
             value= readb[2]<<8 | readb[3]; }
@@ -243,6 +257,7 @@ namespace rovi_motor_drivers {
             value= readb[0]<<8 | readb[1]; }
 
         return (double)value/326.67;
+
     }
 
 

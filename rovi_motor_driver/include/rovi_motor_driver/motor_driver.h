@@ -5,6 +5,7 @@
 #ifndef ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_H
 #define ROVI_VISUAL_MOTOR_CONTROL_MOTOR_DRIVER_H
 
+
 namespace rovi_motor_drivers {
 
     struct cfgPID {
@@ -14,6 +15,8 @@ namespace rovi_motor_drivers {
 
         cfgPID() : p(0.0), i(0.0), d(0.0) {}
         cfgPID(double p, double i, double d) : p(p), i(i), d(d) {}
+
+
     };
 
 
