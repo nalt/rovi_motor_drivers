@@ -113,7 +113,6 @@ namespace rovi_motor_drivers {
 
     void motor_driver_roboclaw::stop(void) {
 
-        std::cout << "stop";
         this->setPWM(0.0);
     }
 
@@ -195,6 +194,9 @@ namespace rovi_motor_drivers {
     }
 
     void motor_driver_roboclaw::setPWM(double pwm) {
+
+        if(pwm > 1.0)  pwm = 1.0;
+        if(pwm < -1.0) pwm = -1.0;
 
         unsigned char writeb[6];
         short pwmvalue = (short) (pwm * 32767.0);
