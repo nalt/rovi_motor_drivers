@@ -213,6 +213,13 @@ namespace rovi_motor_drivers {
         void stop(void) override;
 
 
+        double getCurrent(void);
+
+        int getEncoderCounter(void);
+
+        void resetEncoderCounter();
+
+
 
         /** Configuration **/
 

@@ -50,24 +50,34 @@ namespace rovi_motor_drivers {
 
     double motor_driver_roboclaw::getVelocity() {
 
-        this->serialConnection->flush();
 
         unsigned char writeb[2];
+        std::vector<uint8_t> readb;
+        int value = 0;
 
         writeb[0]=this->cfg.address;
-
         if(this->cfg.motor == 2) {
             writeb[1]=rovi_motor_drivers::commands_roboclaw::GETM2SPEED; }
         else {
             writeb[1]=rovi_motor_drivers::commands_roboclaw::GETM1SPEED; }
 
-        this->serialConnection->write(writeb,2);
 
-        unsigned char readb[7];
-        int value;
-        this->serialConnection->read(readb,7);
+        try {
+            this->serialConnection->write(writeb,2);
+            this->serialConnection->read(readb,7);
+        }
+        catch (const std::exception& e) {
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication getVelocity " << e.what());
+        }
+
+        if(readb.size() != 7) {
+            ROS_INFO_STREAM("Serial packet with unexpected length received: " << readb.size());
+            return 0.0;
+        }
+
         value= (int) (readb[0]<<24 | readb[1]<<16 | readb[2]<<8 | readb[3]);
         return (double) value;
+
     }
 
 
@@ -284,8 +294,81 @@ namespace rovi_motor_drivers {
         return m_crc;
     }
 
+    double motor_driver_roboclaw::getCurrent(void) {
+
+        unsigned char writeb[2];
+        std::vector<uint8_t> readb;
+        short value = 0;
+        writeb[0]=this->cfg.address;
+        writeb[1]=rovi_motor_drivers::commands_roboclaw::GETCURRENTS;
+
+        try {
+            this->serialConnection->write(writeb,2);
+            this->serialConnection->read(readb,6);
+        }
+        catch (const std::exception& e) {
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication getCurrent " << e.what());
+        }
+
+        if(readb.size() != 6) {
+            ROS_INFO_STREAM("Serial packet with unexpected length received: " << readb.size());
+            return 0.0;
+        }
+
+        if(this->cfg.motor == 2) {
+            value= readb[2]<<8 | readb[3]; }
+        else {
+            value= readb[0]<<8 | readb[1]; }
 
 
+        return (double)value/100.00;
+    }
 
+    //readEncoderM1: Read M1 encoder count/position.
+    int motor_driver_roboclaw::getEncoderCounter(void)
+    {
+        unsigned char writeb[2];
+        std::vector<uint8_t> readb;
+        int value = 0;
+        writeb[0]=this->cfg.address;
+
+        if(this->cfg.motor == 2) {
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::GETM2ENC; }
+        else {
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::GETM1ENC; }
+
+
+        try {
+            this->serialConnection->write(writeb,2);
+            this->serialConnection->read(readb,7);
+        }
+        catch (const std::exception& e) {
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication getEncoderCounter " << e.what());
+        }
+
+
+        value = readb[0]<<24 | readb[1]<<16 | readb[2]<<8 | readb[3];
+
+        return value;
+    }
+
+    void motor_driver_roboclaw::resetEncoderCounter(void)
+    {
+        unsigned char writeb[4];
+        std::vector<uint8_t> readb;
+        writeb[0]=this->cfg.address;
+        writeb[1]=rovi_motor_drivers::commands_roboclaw::RESETENC;
+        unsigned short checksum=crc16(writeb, 2);
+        writeb[2]=(checksum >> 8);
+        writeb[3]=checksum & 0xff;
+
+        try {
+            this->serialConnection->write(writeb,4);
+            this->serialConnection->read(readb,1);
+        }
+        catch (const std::exception& e) {
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication getEncoderCounter " << e.what());
+        }
+    }
 
 }
