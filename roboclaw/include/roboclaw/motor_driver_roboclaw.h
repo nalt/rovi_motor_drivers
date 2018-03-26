@@ -180,13 +180,13 @@ namespace rovi_motor_drivers {
 
         void setPWM(double pwm) override;
 
-        double getPWM(void) override;
+        double getPWM() override;
 
         /**
          *
          * @return The velocity of the motor in XYZ
          */
-        double getVelocity(void) override;
+        double getVelocity() override;
 
         /**
          * Set the desired motor velocity
@@ -200,23 +200,34 @@ namespace rovi_motor_drivers {
          *  It parametrizes the serial port (Baudrate, parity bits....)
          *  The address of the port is stored in the static variable serial.
          */
-        bool open(void) override;
+        bool open() override;
 
         /**
          * Closes the serial port.
          */
-        bool close(void) override;
+        bool close() override;
 
         /**
          * Stop the motor.
          */
-        void stop(void) override;
+        void stop() override;
 
 
-        double getCurrent(void);
+        /**
+         * Read the motor current. The resolution of the roboclaw driver is 0.01A.
+         * @return Measured motor current
+         */
+        double getCurrent();
 
-        int getEncoderCounter(void);
+        /**
+         * Read the internal encoder counter.
+         * @return Motor encoder counter.
+         */
+        int getEncoderCounter();
 
+        /**
+         * Reset the internal encoder counter.
+         */
         void resetEncoderCounter();
 
 
@@ -225,14 +236,11 @@ namespace rovi_motor_drivers {
 
         bool setVelocityPID(cfgPID &cfg) override;
 
-        cfgPID getVelocityPID(void) override;
-
+        cfgPID getVelocityPID() override;
 
         inline void setConfig(config_roboclaw &cfg) { this->cfg = cfg; }
 
-        inline config_roboclaw getConfig(void) { return this->cfg; }
-
-
+        inline config_roboclaw getConfig() { return this->cfg; }
 
         std::shared_ptr<serial::Serial> serialConnection;
 
@@ -242,8 +250,6 @@ namespace rovi_motor_drivers {
 
         std::string name = "motor_driver_roboclaw";
         config_roboclaw cfg;
-
-
 
         /**
          * @brief Computes the CRC-16 (Cyclic Redundancy Check) of len bytes in byte array message
