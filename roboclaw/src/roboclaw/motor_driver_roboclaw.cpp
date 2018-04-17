@@ -36,7 +36,7 @@ namespace rovi_motor_drivers {
             serial::Timeout timeout = serial::Timeout::simpleTimeout(cfg.timeout);
             serialConnection->setTimeout(timeout);
             serialConnection->open();
-            ROS_INFO_STREAM_NAMED(this->name, "Serial port opened successfully: " << this->cfg.device << " (" << this->cfg.address << ")");
+            ROS_INFO_STREAM_NAMED(this->name, "Serial port opened successfully: " << this->cfg.device << " (Baudrate: " << serialConnection->getBaudrate() << " Address: " << this->cfg.address << ")");
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "Serial Error: Failed to open serial port: " << e.what());
             return false;
@@ -232,11 +232,58 @@ namespace rovi_motor_drivers {
             this->serialConnection->read(&readb,1);
         }
         catch (const std::exception& e) {
-            ROS_ERROR_STREAM("Error in Roboclaw serial communication getPWM " << e.what());
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication setPwm " << e.what());
         }
 
 
         //return readb;
+
+    }
+
+    void motor_driver_roboclaw::setPWM(double pwm, double acceleration) {
+
+        if(pwm == 0.0) { stop(); return; }
+
+        if(pwm > 1.0)  pwm = 1.0;
+        if(pwm < -1.0) pwm = -1.0;
+
+        if(acceleration > 1.0)  acceleration = 1.0;
+        if(acceleration < 0.0) acceleration = 0.0;
+
+        unsigned char writeb[10];
+        short pwmvalue = (short) (pwm * 32767.0);
+        unsigned int acc = (unsigned int) (acceleration * 655359);
+
+        writeb[0]=this->cfg.address;
+
+        if(this->cfg.motor == 2) {
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::M2DUTYACCEL; }
+        else {
+            writeb[1]=rovi_motor_drivers::commands_roboclaw::M1DUTYACCEL; }
+
+        writeb[2]=pwmvalue>>8;
+        writeb[3]=pwmvalue & 0xff;
+
+        writeb[4]=acc>>24;
+        writeb[5]=acc>>16;
+        writeb[6]=acc>>8;
+        writeb[7]=acc & 0xff;
+
+        unsigned short checksum;
+        checksum=crc16(writeb, 8);
+        writeb[8]=(checksum >> 8);
+        writeb[9]=checksum & 0xff;
+
+        unsigned char readb;
+
+        try {
+            this->serialConnection->write(writeb,10);
+            this->serialConnection->read(&readb,1);
+        }
+        catch (const std::exception& e) {
+            ROS_ERROR_STREAM("Error in Roboclaw serial communication setPwm with acceleration " << e.what());
+        }
+
 
     }
 
@@ -370,5 +417,7 @@ namespace rovi_motor_drivers {
             ROS_ERROR_STREAM("Error in Roboclaw serial communication getEncoderCounter " << e.what());
         }
     }
+
+
 
 }

@@ -21,6 +21,7 @@ namespace rovi_motor_drivers {
         int qpps = 1000;
         int baudrate = 115200;
         int timeout = 100;
+        double pwm_acceleration;
     };
 
     struct commands_roboclaw {
@@ -229,6 +230,8 @@ namespace rovi_motor_drivers {
          * Reset the internal encoder counter.
          */
         void resetEncoderCounter();
+
+        void setPWM(double pwm, double acceleration);
 
 
 

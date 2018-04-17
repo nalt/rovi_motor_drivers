@@ -11,7 +11,7 @@ int main(int argc, char** argv)
 {
 
     rovi_motor_drivers::config_roboclaw cfg;
-    cfg.device = "/dev/ttyUSB0";
+    cfg.device = "/dev/ttyACM0";
     cfg.motor = 1;
     cfg.address = 128;
     cfg.qpps = 4000;
@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     rovi_motor_drivers::motor_driver_roboclaw roboclaw_driver("driver_roboclaw", cfg);
     std::cout << "Connect 1: " << roboclaw_driver.open() << std::endl;
 
-    cfg.address = 128;
+    /*cfg.address = 128;
     cfg.motor = 2;
     rovi_motor_drivers::motor_driver_roboclaw roboclaw_driver2("driver_roboclaw", cfg);
     std::cout << "Connect 2: " << roboclaw_driver2.open() << std::endl;
@@ -38,15 +38,23 @@ int main(int argc, char** argv)
     cfg.address = 130;
     cfg.motor = 1;
     rovi_motor_drivers::motor_driver_roboclaw roboclaw_driver5("driver_roboclaw", cfg);
-    std::cout << "Connect 3: " << roboclaw_driver5.open() << std::endl;
+    std::cout << "Connect 3: " << roboclaw_driver5.open() << std::endl;*/
 
 
     while(true) {
-        std::cout << "PWM1 " << roboclaw_driver.getPWM() << std::endl;
-        std::cout << "PWM2 " << roboclaw_driver2.getPWM() << std::endl;
-        std::cout << "PWM3 " << roboclaw_driver3.getPWM() << std::endl;
-        std::cout << "PWM4 " << roboclaw_driver4.getPWM() << std::endl;
-        std::cout << "PWM5 " << roboclaw_driver5.getPWM() << std::endl;
+        roboclaw_driver.setPWM(-0.2, 0.5);
+
+        sleep(1);
+
+        roboclaw_driver.stop();
+
+        sleep(1);
+        roboclaw_driver.setPWM(0.2, 0.5);
+
+
+        //std::cout << "PWM3 " << roboclaw_driver3.getPWM() << std::endl;
+        //std::cout << "PWM4 " << roboclaw_driver4.getPWM() << std::endl;
+        //std::cout << "PWM5 " << roboclaw_driver5.getPWM() << std::endl;
         //sleep(0.0001);
     }
 
