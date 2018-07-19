@@ -19,6 +19,14 @@ namespace rovi_motor_drivers {
 
     };
 
+    struct motor_state {
+        double position;
+        double velocity;
+        double current;
+        double torque;
+    };
+
+
 
     class motor_driver {
 
@@ -42,6 +50,17 @@ namespace rovi_motor_drivers {
 
     };
 
+    class motor_driver_position : public motor_driver {
+
+        virtual double getPosition(void)=0;
+
+        virtual void setPosition(double p)=0;
+
+        virtual bool setPositionPID(cfgPID &cfg)=0;
+
+        virtual cfgPID getPositionPID(void)=0;
+    };
+
     class motor_driver_velocity : public motor_driver {
 
         virtual double getVelocity(void)=0;
@@ -51,6 +70,17 @@ namespace rovi_motor_drivers {
         virtual bool setVelocityPID(cfgPID &cfg)=0;
 
         virtual cfgPID getVelocityPID(void)=0;
+    };
+
+    class motor_driver_torque : public motor_driver {
+
+        virtual double getTorque(void)=0;
+
+        virtual void setTorque(double t)=0;
+
+        virtual bool setTorquePID(cfgPID &cfg)=0;
+
+        virtual cfgPID getTorquePID(void)=0;
     };
 
 }

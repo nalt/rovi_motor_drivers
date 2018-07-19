@@ -262,6 +262,10 @@ namespace rovi_motor_drivers {
          */
         unsigned short crc16(unsigned char *data, int len);
 
+        unsigned int num_set_pwm_errors = 0;
+
+        unsigned int num_error_threshold = 3;
+
 
     };
 

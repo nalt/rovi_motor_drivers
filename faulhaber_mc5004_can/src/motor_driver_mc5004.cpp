@@ -1,0 +1,601 @@
+//
+// Created by cschuwerk on 11/13/17.
+//
+
+#include "faulhaber_mc5004_can/motor_driver_mc5004.h"
+
+
+
+namespace rovi_motor_drivers {
+
+    const std::map<unsigned int, std::string> cfg_baudrate_kacanopen::map = cfg_baudrate_kacanopen::create_map();
+    const std::map<unsigned int, std::string> mc5004_device_status::map = mc5004_device_status::create_map();
+
+    motor_driver_mc5004::motor_driver_mc5004() :
+            motor_driver_mc5004(1, "slcan0", 500000) {
+        ROS_INFO_STREAM_NAMED(this->name, "No device name and baudrate specified. Using slcan0 and 500000.");
+    }
+
+    motor_driver_mc5004::motor_driver_mc5004(unsigned int nodeid, std::string busname, unsigned int baudrate) :
+            motor_driver_mc5004(nodeid,busname,baudrate,"") {}
+
+    motor_driver_mc5004::motor_driver_mc5004(unsigned int nodeid, std::string busname, unsigned int baudrate,
+                                             std::string eds_file) :
+            nodeid(nodeid),
+            busname(busname),
+            baudrate(baudrate),
+            eds_file(eds_file)
+    {
+        this->device = NULL;
+        this->master = new kaco::Master();
+
+        this->max_acceleration = 0;
+        this->max_deceleration = 0;
+        this->max_velocity = 0;
+
+        this->uc = mc_5004_unit_conversion();
+
+        this->uc._pos_SI_offset = 16;
+        this->uc._pos_SI_to_Faulhaber = 1000.0;
+        this->uc._vel_SI_to_Faulhaber = 1000.0;
+
+    }
+
+    motor_driver_mc5004::~motor_driver_mc5004() {
+        this->stop();
+        this->close();
+        ROS_INFO_STREAM_NAMED(this->name, "Faulhaber MC 5004 driver shutdown: " << this->name);
+    }
+
+    bool motor_driver_mc5004::open() {
+
+        // Initialize the CAN master
+        try {
+            ROS_INFO_STREAM_NAMED(this->name, "Initializing CAN master on bus " << this->busname << " with baudrate " << this->baudrate);
+            this->master->start(busname, rovi_motor_drivers::cfg_baudrate_kacanopen::map.at(this->baudrate));
+            ROS_INFO_STREAM_NAMED(this->name, "CAN master started successfully");
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "Starting master failed: " << e.what());
+            return false;
+        }
+
+        // Check if a device was found
+        while (master->num_devices()<1) {
+            ROS_ERROR_STREAM_NAMED(this->name, "No CAN devices found.");
+            ROS_INFO_STREAM_NAMED(this->name, "Trying to discover more nodes via NMT Node Guarding...");
+            master->core.nmt.discover_nodes();
+            ros::Duration(1.0).sleep();
+        }
+
+        // A device was found:
+        ROS_INFO_STREAM_NAMED(this->name,"At least one CAN device was found on the bus. Checking the correct node id...");
+        for (size_t i=0; i<master->num_devices(); ++i) {
+
+            device = &master->get_device(i);
+            device->start();
+
+            if(this->eds_file.empty()) {
+                //device->load_dictionary_from_library(); // This is not very specific; load the .eds file instead if given
+                ROS_ERROR_STREAM_NAMED(this->name, "No .eds file specified!");
+                return false;
+            }
+            else {
+                try {
+                    ROS_INFO_STREAM_NAMED(this->name,"Loaded .eds file from path: " << this->eds_file);
+                    device->load_dictionary_from_eds(this->eds_file);
+
+                } catch (std::exception &e) {
+                    ROS_ERROR_STREAM_NAMED(this->name, "Loading .eds file failed: " << e.what());
+                    return false;
+                }
+            }
+
+            const auto profile = device->get_device_profile_number();
+            unsigned int dev_node_id = (unsigned)device->get_node_id();
+
+            ROS_INFO_STREAM_NAMED(this->name,"Found CiA "<<std::dec<<(unsigned)profile<<" device with node ID "<<dev_node_id<<": "<<device->get_entry("manufacturer_device_name"));
+
+
+            if(!this->nodeid == dev_node_id) {
+                device=NULL;
+                continue; }
+
+            // The device has the correct node id
+            if (profile==402) {
+
+                this->status_found_device402 = true;
+
+                this->device->read_complete_dictionary();
+
+                ROS_INFO_STREAM_NAMED(this->name,"Dictionary:");
+                this->device->print_dictionary();
+            }
+
+
+            // Read the max_velocity and max_acceleration registers
+            this->max_velocity = device->get_entry("max_motor_speed");
+            this->max_acceleration =  device->get_entry("max_acceleration");
+            this->max_deceleration =  device->get_entry("max_deceleration");
+            ROS_INFO_STREAM_NAMED(this->name,"max_velocity: " << this->max_velocity << " max_acceleration: " << this->max_acceleration << " max_deceleration: " << this->max_deceleration);
+
+
+            // Add the PDO mappings:
+            device->add_receive_pdo_mapping(0x0280+this->nodeid, "position_actual_value", 0);
+            device->add_receive_pdo_mapping(0x0280+this->nodeid, "velocity_actual_value", 4);
+            device->add_receive_pdo_mapping(0x0380+this->nodeid, "torque_actual_value", 0);
+            device->add_receive_pdo_mapping(0x0380+this->nodeid, "current_actual_value", 2);
+
+            // Reset from (potential) previous fault and also enable operation
+            this->resetFromErrorState();
+            ros::Duration(0.2).sleep(); // wait for some time for the motor driver to reset and enable again
+
+            // Check if the motor driver is ready to receive commands:
+            int s = this->getDeviceStatus();
+            if(s==39) {
+                ROS_INFO_STREAM_NAMED(this->name,"The motor was enabled and is now in state: " << rovi_motor_drivers::mc5004_device_status::map.at(s));
+            }
+            else {
+                ROS_ERROR_STREAM_NAMED(this->name,"The motor was not enabled successfully! Device state: " << s);
+                this->debugDeviceStatus();
+            }
+
+
+            // Read the motor data from the controller, especially the rated current for the motor
+            // This is required to convert the Faulhaber units to real world SI units
+            uint16_t rated_current = this->device->get_entry((uint16_t) 0x2329, (uint8_t) 0x01, kaco::ReadAccessMethod::sdo);
+            double r_current = static_cast<double>(rated_current); // This is the rated current in mA
+            ROS_INFO_STREAM_NAMED(this->name,"The rated current for the motor is: " << r_current << "mA");
+            this->uc._current_SI_to_Faulhaber = this->uc._torque_SI_to_Faulhaber = 1000 / r_current;
+        }
+
+        return true;
+
+    }
+
+
+    bool motor_driver_mc5004::close() {
+
+        this->stop();
+
+        if(this->device != NULL)
+            this->device->set_entry("controlword", (uint16_t) 0x0006); // shutdown
+
+        //this->master->stop(); //throws an sdo_error!?
+
+    }
+
+
+    void motor_driver_mc5004::stop() {
+        this->device->execute("set_controlword_flag", "controlword_halt"); // halt
+        //this->device->execute("unset_controlword_flag", "controlword_halt"); // halt
+    }
+
+    bool motor_driver_mc5004::switch_on() {
+        if(device==NULL) return false;
+
+        try {
+            device->execute("set_controlword_flag", "controlword_switch_on");
+            ROS_WARN_STREAM_NAMED(this->name, "Driver switch on!");
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "switch_on(): " << e.what());
+            return false;
+        }
+    }
+
+    bool motor_driver_mc5004::shut_down() {
+        if(device==NULL) return false;
+
+        try {
+            device->execute("unset_controlword_flag", "controlword_switch_on");
+            ROS_WARN_STREAM_NAMED(this->name, "Driver shut down executed!");
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "shut_down(): " << e.what());
+            return false;
+        }
+    }
+
+    bool motor_driver_mc5004::disable_operation() {
+        if(device==NULL) return false;
+
+        try {
+            device->execute("unset_controlword_flag", "controlword_enable_operation");
+            ROS_INFO_STREAM_NAMED(this->name, "Motor driver disabled!");
+            return true;
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "disable_operation(): " << e.what());
+            return false;
+        }
+    }
+
+    bool motor_driver_mc5004::enable_operation() {
+        if(device==NULL) return false;
+
+        try {
+            this->device->execute("enable_operation");
+            ROS_INFO_STREAM_NAMED(this->name, "Motor driver enabled!");
+            return true;
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "enable_operation(): " << e.what());
+            return false;
+        }
+    }
+
+
+
+    bool motor_driver_mc5004::quick_stop() {
+        if(device==NULL) return false;
+
+        try {
+            device->execute("unset_controlword_flag", "controlword_quick_stop");
+            ROS_WARN_STREAM_NAMED(this->name, "Quick stop executed!");
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "quick_stop(): " << e.what());
+            return false;
+        }
+    }
+
+
+    // Position mode
+    bool motor_driver_mc5004::setPositionPID(cfgPID &cfg) {
+
+        ROS_ERROR_STREAM_NAMED(this->name, "setPositionPID() currently not implemented!");
+        return false;
+    }
+
+
+    cfgPID motor_driver_mc5004::getPositionPID(void) {
+
+
+        return cfgPID();
+    }
+
+    double motor_driver_mc5004::getPosition() {
+        if(this->device == NULL) return NAN;
+        try {
+            this->sendSyncMessage();
+            const int32_t position = this->device->get_entry("position_actual_value", kaco::ReadAccessMethod::cache);
+            return uc.pos_Faulhaber_to_SI((double)position);
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getPosition(): " << e.what());
+            return NAN;
+        }
+    }
+
+
+    void motor_driver_mc5004::setPosition(double p) {
+        if(this->device == NULL) return;
+        if(this->control_mode.empty() || (!this->control_mode.compare("profile_position_mode") && !this->control_mode.compare("cyclic_synchronous_position_mode"))) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setPosition(): The current control mode ("<<this->control_mode<<") does not allow to set a target position.");
+            return;
+        }
+        try {
+            this->device->execute("unset_controlword_flag", "controlword_halt");
+            this->device->execute("set_controlword_flag", "controlword_pp_change_set_immediately"); // Old position commands are skipped and the new one is executed immediately
+            this->device->execute("set_target_position", (signed) uc.pos_SI_to_Faulhaber(p)); // Use the macro to set all the flags required for the position modes
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setPosition("<<(signed) p<<"): " << e.what());
+            return;
+        }
+    }
+
+    void motor_driver_mc5004::setPosition(double p, double v) {
+        if(device==NULL) return;
+
+        uint32_t vel = (uint32_t) std::fabs(uc.vel_SI_to_Faulhaber(v));
+
+        vel = boost::algorithm::clamp(vel, 1, this->max_velocity);
+        try {
+            this->device->set_entry("profile_velocity", vel, kaco::WriteAccessMethod::use_default);
+            this->setPosition(p);
+            this->device->set_entry("profile_velocity", this->max_velocity, kaco::WriteAccessMethod::use_default);
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setPosition(p,v): " << e.what(););
+        }
+
+        return;
+    }
+
+    void motor_driver_mc5004::setPosition(double p, double v, double a) {
+        if(device==NULL) return;
+
+        uint32_t acc = (uint32_t) std::fabs(a);
+        acc = boost::algorithm::clamp(acc, 1, this->max_acceleration);
+        try {
+            this->device->set_entry("profile_acceleration", acc, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_deceleration", acc, kaco::WriteAccessMethod::use_default);
+            this->setPosition(p,v);
+            this->device->set_entry("profile_acceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_deceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setPosition(p,v,a): " << e.what(););
+        }
+
+        return;
+    }
+
+
+
+    // Velocity mode
+    double motor_driver_mc5004::getVelocity() {
+        if(this->device == NULL) return NAN;
+        try {
+            this->sendSyncMessage();
+            const int32_t velocity = this->device->get_entry("velocity_actual_value", kaco::ReadAccessMethod::cache);
+            return uc.vel_Faulhaber_to_SI((double)velocity);
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getVelocity(): " << e.what());
+            return NAN;
+        }
+    }
+
+
+    void motor_driver_mc5004::setVelocity(double v) {
+        if(this->device == NULL) return;
+        if(this->control_mode.empty() || (!this->control_mode.compare("profile_velocity_mode") && !this->control_mode.compare("cyclic_synchronous_velocity_mode")) ) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setVelocity(): The current control mode does not allow to set a target velocity.");
+            return;
+        }
+        try {
+            this->device->execute("unset_controlword_flag", "controlword_halt");
+            this->device->execute("set_controlword_flag", "controlword_pp_change_set_immediately"); // Old velocity commands are skipped and the new one is executed immediately
+            this->device->set_entry("target_velocity", (signed) uc.vel_SI_to_Faulhaber(v));
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setVelocity("<<(signed) v<<"): " << e.what());
+            return;
+        }
+    }
+
+    void motor_driver_mc5004::setVelocity(double v, double a) {
+        if(device==NULL) return;
+
+        uint32_t acc = (uint32_t) std::fabs(a);
+        acc = boost::algorithm::clamp(acc, 1, this->max_acceleration);
+        try {
+            this->device->set_entry("profile_acceleration", acc, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_deceleration", acc, kaco::WriteAccessMethod::use_default);
+            this->setVelocity(v);
+            this->device->set_entry("profile_acceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_deceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setPosition(p,v,a): " << e.what(););
+        }
+
+        return;
+    }
+
+    bool motor_driver_mc5004::setVelocityPID(cfgPID &cfg) {
+
+        ROS_ERROR_STREAM_NAMED(this->name, "setVelocityPID() currently not implemented!");
+        return false;
+    }
+
+
+    cfgPID motor_driver_mc5004::getVelocityPID(void) {
+
+        return cfgPID();
+
+    }
+
+
+    // Torque Mode
+    double motor_driver_mc5004::getTorque() {
+        if(this->device == NULL) return NAN;
+        try {
+            this->sendSyncMessage();
+            const int16_t torque = this->device->get_entry("torque_actual_value", kaco::ReadAccessMethod::cache);
+            return uc.torque_Faulhaber_to_SI((double)torque);
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getTorque(): " << e.what());
+            return NAN;
+        }
+    }
+
+    void motor_driver_mc5004::setTorque(double t) {
+        ROS_ERROR_STREAM_NAMED(this->name, "setTorque() currently not implemented!");
+    }
+
+    double motor_driver_mc5004::getCurrent() {
+        if(this->device == NULL) return NAN;
+        try {
+            this->sendSyncMessage();
+            const int16_t current = this->device->get_entry("current_actual_value", kaco::ReadAccessMethod::cache);
+            return uc.current_Faulhaber_to_SI((double)current);
+
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getCurrent(): " << e.what());
+            return NAN;
+        }
+    }
+
+    bool motor_driver_mc5004::setTorquePID(cfgPID &cfg) {
+        ROS_ERROR_STREAM_NAMED(this->name, "setTorquePID() currently not implemented!");
+        return false;
+    }
+
+    cfgPID motor_driver_mc5004::getTorquePID() {
+        if(device == NULL) return cfgPID();
+
+        try {
+            rovi_motor_drivers::cfgPID cfg;
+            cfg.p = device->get_entry((uint16_t) 0x2342, (uint8_t) 0x01, kaco::ReadAccessMethod::use_default);
+            cfg.i = device->get_entry((uint16_t) 0x2342, (uint8_t) 0x02, kaco::ReadAccessMethod::use_default);
+            cfg.d = 0.0;
+            std::cout << "p " << cfg.p << " i: " << cfg.i << std::endl;
+            return cfg;
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getTorquePID(): " << e.what());
+            return cfgPID();
+        }
+    }
+
+    bool motor_driver_mc5004::resetFromErrorState(void) {
+
+        if(device == NULL) return false;
+
+        try {
+            device->set_entry("controlword", (uint16_t) 0x0008); // fault-reset
+            device->set_entry("controlword", (uint16_t) 0x0006); // shut-down
+            device->set_entry("controlword", (uint16_t) 0x000F); // enable_operation operation
+            ROS_INFO_STREAM_NAMED(this->name, "Reset from error state performed");
+            return true;
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "resetFromErrorState(): " << e.what());
+            return false;
+        }
+
+
+
+    }
+
+    bool motor_driver_mc5004::setControlMode(std::string control_mode) {
+        if(device==NULL) return false;
+        if(control_mode == "" || control_mode.empty()) return false;
+
+        try {
+            device->set_entry("modes_of_operation", device->get_constant(control_mode));
+            this->control_mode = control_mode;
+            ROS_INFO_STREAM_NAMED(this->name, "Set the control mode to: " << control_mode);
+            return true;
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setControlMode(): " << e.what());
+            return false;
+        }
+    }
+
+    std::string motor_driver_mc5004::getControlMode(void) {
+        return this->control_mode;
+    }
+
+    int motor_driver_mc5004::getDeviceStatus() {
+
+        if(device==NULL) return -1;
+
+        try {
+            this->sendSyncMessage();
+            uint16_t statusword = device->get_entry("statusword");
+
+            return static_cast<int16_t>(statusword & 255);
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
+            return -1;
+        }
+    }
+
+
+
+    void motor_driver_mc5004::debugDeviceStatus(void) {
+
+        uint16_t status = this->getDeviceStatus();
+        try {
+            std::string device_mode_str = rovi_motor_drivers::mc5004_device_status::map.at(status);
+            ROS_INFO_STREAM_NAMED(this->name, "Status: " << device_mode_str << " (" << status << ")");
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "Unknown device status code: " << status;);
+        }
+        return;
+    }
+
+    bool motor_driver_mc5004::perform_homing(unsigned int max_time) {
+        if(device==NULL) return false;
+
+        bool success = false;
+        std::string control_mode_orig = this->getControlMode();
+
+        // Unset the option to use the position limits in speed mode, because otherwise the Homing does not work
+        uint16_t op_mode = device->get_entry("operation_mode_options");
+        uint16_t op_mode_orig = op_mode;
+        std::bitset<8> operation_mode(op_mode);
+        if(operation_mode.test(1)) {
+            ROS_INFO_STREAM("Operation mode options: 'Use position limits in speed mode' is set to true. Disabling it for the homing procedure.");
+            operation_mode[1] = 0;
+            op_mode = (uint16_t)(operation_mode.to_ulong());
+            device->set_entry("operation_mode_options",op_mode);
+        }
+
+        // Start the Homing procedure
+        device->execute("unset_controlword_flag","controlword_hm_operation_start");
+        this->setControlMode("homing_mode");
+        device->execute("set_controlword_flag","controlword_hm_operation_start");
+
+        unsigned int i=0;
+
+        // Check the status of the homing procedure
+        while(i<=max_time) {
+            ros::Duration(1.0).sleep();
+            uint16_t status = device->get_entry("statusword");
+            std::bitset<16> bs(status);
+
+            ROS_INFO_STREAM_NAMED(this->name,"Homing status word: bit10: " << bs[10] << " bit12: " << bs[12] << " bit13: " << bs[13]);
+
+            if(!bs.test(13) && !bs.test(12) && !bs.test(10)) {
+                ROS_INFO_STREAM_NAMED(this->name, "perform_homing(): Homing is running!");
+            }
+            else if(!bs.test(13) && bs.test(12) && bs.test(10)) { // Homing is finished
+                success = true;
+                break;
+            }
+            else if(bs.test(13)) { // Error bit is set!
+                break;
+            }
+            i++;
+        }
+
+        // Stop the homing and reset the operation mode
+        device->execute("unset_controlword_flag","controlword_hm_operation_start");
+        device->set_entry("operation_mode_options",op_mode_orig);
+        this->stop();
+
+        // Set the original control mode again
+        this->setControlMode(control_mode_orig);
+
+        if(success)
+            ROS_INFO_STREAM_NAMED(this->name, "perform_homing(): Homing is finished!");
+        else
+            ROS_ERROR_STREAM_NAMED(this->name, "perform_homing(): Error during homing or homing did not finish within the allocated time!");
+
+        return success;
+    }
+
+    void motor_driver_mc5004::sendSyncMessage(void) {
+
+        kaco::Message sync_msg;
+        //sync_msg.cob_id = 0x0281;
+        sync_msg.cob_id = 0x080;
+        sync_msg.len = 0;
+        sync_msg.rtr = 0;
+        this->master->core.send(sync_msg);
+
+    }
+
+    motor_state motor_driver_mc5004::getMotorState(void) {
+        motor_state current_state;
+        if(device==NULL) return current_state;
+
+        try {
+            this->sendSyncMessage();
+            int32_t pos = this->device->get_entry("position_actual_value", kaco::ReadAccessMethod::cache);
+            int32_t vel = this->device->get_entry("velocity_actual_value", kaco::ReadAccessMethod::cache);
+            int16_t torque = this->device->get_entry("torque_actual_value", kaco::ReadAccessMethod::cache);
+            int16_t currrent = this->device->get_entry("current_actual_value", kaco::ReadAccessMethod::cache);
+            current_state.position = uc.pos_Faulhaber_to_SI(static_cast<double>(pos));
+            current_state.velocity = uc.vel_Faulhaber_to_SI(static_cast<double>(vel));
+            current_state.torque   = uc.torque_Faulhaber_to_SI(static_cast<double>(torque));
+            current_state.current  = uc.current_Faulhaber_to_SI(static_cast<double>(currrent));
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
+        }
+        return current_state;
+        //ROS_INFO_STREAM(current_state.position << " " << current_state.velocity << " " << current_state.torque << " " << current_state.velocity);
+    }
+
+
+
+
+}

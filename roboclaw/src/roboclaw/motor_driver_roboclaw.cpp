@@ -205,6 +205,12 @@ namespace rovi_motor_drivers {
 
     void motor_driver_roboclaw::setPWM(double pwm) {
 
+        if(num_set_pwm_errors > num_error_threshold) {
+            this->close();
+            this->open();
+            num_set_pwm_errors = 0;
+        }
+
         if(pwm > 1.0)  pwm = 1.0;
         if(pwm < -1.0) pwm = -1.0;
 
@@ -226,10 +232,14 @@ namespace rovi_motor_drivers {
         writeb[5]=checksum & 0xff;
 
         unsigned char readb;
+        unsigned int num_bytes_received = 0;
 
         try {
             this->serialConnection->write(writeb,6);
-            this->serialConnection->read(&readb,1);
+            num_bytes_received = this->serialConnection->read(&readb,1);
+
+            if(num_bytes_received != 1)
+                num_set_pwm_errors++;
         }
         catch (const std::exception& e) {
             ROS_ERROR_STREAM("Error in Roboclaw serial communication setPwm " << e.what());
@@ -241,6 +251,12 @@ namespace rovi_motor_drivers {
     }
 
     void motor_driver_roboclaw::setPWM(double pwm, double acceleration) {
+
+        if(num_set_pwm_errors > num_error_threshold) {
+            num_set_pwm_errors = 0;
+            this->close();
+            this->open();
+        }
 
         if(pwm == 0.0) { stop(); return; }
 
@@ -275,10 +291,14 @@ namespace rovi_motor_drivers {
         writeb[9]=checksum & 0xff;
 
         unsigned char readb;
+        unsigned int num_bytes_received = 0;
 
         try {
             this->serialConnection->write(writeb,10);
-            this->serialConnection->read(&readb,1);
+            num_bytes_received = this->serialConnection->read(&readb,1);
+
+            if(num_bytes_received != 1)
+                num_set_pwm_errors++;
         }
         catch (const std::exception& e) {
             ROS_ERROR_STREAM("Error in Roboclaw serial communication setPwm with acceleration " << e.what());
