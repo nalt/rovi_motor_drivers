@@ -92,6 +92,18 @@ namespace rovi_motor_drivers {
         double current_Faulhaber_to_SI(double current) { return current/_current_SI_to_Faulhaber + _current_SI_offset; }
         double current_SI_to_Faulhaber(double current) { return (current - _current_SI_offset) * _current_SI_to_Faulhaber; }
 
+        void print(void) {
+            std::cout << "pos_SI_to_Faulhaber: " <<  _pos_SI_to_Faulhaber << std::endl;
+            std::cout << "pos_SI_offset: " <<  _pos_SI_offset << std::endl;
+            std::cout << "vel_SI_to_Faulhaber: " <<  _vel_SI_to_Faulhaber << std::endl;
+            std::cout << "vel_SI_offset: " <<  _vel_SI_offset << std::endl;
+            std::cout << "torque_SI_to_Faulhaber: " <<  _torque_SI_to_Faulhaber << std::endl;
+            std::cout << "torque_SI_offset: " <<  _torque_SI_offset << std::endl;
+            std::cout << "current_SI_to_Faulhaber: " <<  _current_SI_to_Faulhaber << std::endl;
+            std::cout << "current_SI_offset: " <<  _current_SI_offset << std::endl;
+
+        }
+
     };
 
 
@@ -118,6 +130,9 @@ namespace rovi_motor_drivers {
     public:
         motor_driver_mc5004();
 
+
+        motor_driver_mc5004(ros::NodeHandle &nh);
+
         /**
          * Constructor.
          * @param nodeid Node of the Faulhaber motor driver.
@@ -136,6 +151,8 @@ namespace rovi_motor_drivers {
         motor_driver_mc5004(unsigned int nodeid, std::string busname, unsigned int baudrate, std::string eds_file);
 
         ~motor_driver_mc5004();
+
+        void init(void);
 
 
         /*

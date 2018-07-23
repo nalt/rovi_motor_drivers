@@ -11,9 +11,8 @@ namespace rovi_motor_drivers {
     const std::map<unsigned int, std::string> cfg_baudrate_kacanopen::map = cfg_baudrate_kacanopen::create_map();
     const std::map<unsigned int, std::string> mc5004_device_status::map = mc5004_device_status::create_map();
 
-    motor_driver_mc5004::motor_driver_mc5004() :
-            motor_driver_mc5004(1, "slcan0", 500000) {
-        ROS_INFO_STREAM_NAMED(this->name, "No device name and baudrate specified. Using slcan0 and 500000.");
+    motor_driver_mc5004::motor_driver_mc5004() {
+        //ROS_INFO_STREAM_NAMED(this->name, "No device name and baudrate specified. Using slcan0 and 500000.");
     }
 
     motor_driver_mc5004::motor_driver_mc5004(unsigned int nodeid, std::string busname, unsigned int baudrate) :
@@ -26,6 +25,50 @@ namespace rovi_motor_drivers {
             baudrate(baudrate),
             eds_file(eds_file)
     {
+        this->init();
+    }
+
+    motor_driver_mc5004::motor_driver_mc5004(ros::NodeHandle &nh) {
+
+        int nodeid,baudrate;
+        std::string eds_file;
+        int error = 0;
+
+
+        if(!nh.getParam("nodeid", nodeid)) error++;
+        if(!nh.getParam("baudrate", baudrate)) error++;
+        if(!nh.getParam("device", busname)) error++;
+
+        if(error>0) {
+            ROS_ERROR_STREAM_NAMED(this->name, "Required parameters nodeid, baudrate and device are not set!");
+            ros::shutdown();
+        }
+        this->nodeid = (unsigned int) nodeid;
+        this->baudrate = (unsigned int) baudrate;
+        this->busname = busname;
+
+        // Device configuration file
+        nh.getParam("eds_file", this->eds_file);
+
+        this->init();
+
+        // Convert
+        nh.getParam("unit_conversion/pos_SI_offset", this->uc._pos_SI_offset);
+        nh.getParam("unit_conversion/pos_SI_to_Faulhaber", this->uc._pos_SI_to_Faulhaber);
+        nh.getParam("unit_conversion/vel_SI_offset", this->uc._vel_SI_offset);
+        nh.getParam("unit_conversion/vel_SI_to_Faulhaber", this->uc._vel_SI_to_Faulhaber);
+        nh.getParam("unit_conversion/current_SI_offset", this->uc._current_SI_offset);
+        nh.getParam("unit_conversion/current_SI_to_Faulhaber", this->uc._current_SI_to_Faulhaber);
+        nh.getParam("unit_conversion/torque_SI_offset", this->uc._torque_SI_offset);
+        nh.getParam("unit_conversion/torque_SI_to_Faulhaber", this->uc._torque_SI_to_Faulhaber);
+
+        ROS_INFO_STREAM_NAMED(this->name, "Unit conversion loaded from parameter server:");
+        this->uc.print();
+
+    }
+
+    void motor_driver_mc5004::init(void) {
+
         this->device = NULL;
         this->master = new kaco::Master();
 
@@ -35,24 +78,25 @@ namespace rovi_motor_drivers {
 
         this->uc = mc_5004_unit_conversion();
 
-        this->uc._pos_SI_offset = 16;
-        this->uc._pos_SI_to_Faulhaber = 1000.0;
-        this->uc._vel_SI_to_Faulhaber = 1000.0;
-
     }
 
+
     motor_driver_mc5004::~motor_driver_mc5004() {
-        this->stop();
-        this->close();
-        ROS_INFO_STREAM_NAMED(this->name, "Faulhaber MC 5004 driver shutdown: " << this->name);
+        //this->stop();
+        //this->close();
+        //ROS_INFO_STREAM_NAMED(this->name, "Faulhaber MC 5004 driver shutdown: " << this->name);
     }
 
     bool motor_driver_mc5004::open() {
 
         // Initialize the CAN master
+        if(rovi_motor_drivers::cfg_baudrate_kacanopen::map.find(this->baudrate) == rovi_motor_drivers::cfg_baudrate_kacanopen::map.end()) {
+            ROS_ERROR_STREAM_NAMED(this->name, "The specified baudrate is not possible: " << baudrate);
+            return false;
+        }
         try {
             ROS_INFO_STREAM_NAMED(this->name, "Initializing CAN master on bus " << this->busname << " with baudrate " << this->baudrate);
-            this->master->start(busname, rovi_motor_drivers::cfg_baudrate_kacanopen::map.at(this->baudrate));
+            if(!this->master->start(busname, rovi_motor_drivers::cfg_baudrate_kacanopen::map.at(this->baudrate))) return false;
             ROS_INFO_STREAM_NAMED(this->name, "CAN master started successfully");
 
         } catch (std::exception &e) {
@@ -594,7 +638,6 @@ namespace rovi_motor_drivers {
         return current_state;
         //ROS_INFO_STREAM(current_state.position << " " << current_state.velocity << " " << current_state.torque << " " << current_state.velocity);
     }
-
 
 
 

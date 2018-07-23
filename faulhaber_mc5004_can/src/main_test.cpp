@@ -9,7 +9,8 @@
 #include <signal.h>
 #include <iostream>
 
-rovi_motor_drivers::motor_driver_mc5004 driver(1,std::string("slcan0"),1000000,"/data/home/ne89hex/rovi_code/rovi_ws/src/driver/rovi_motor_drivers/faulhaber_mc5004_can/config/605.0121.01-H.eds");
+//rovi_motor_drivers::motor_driver_mc5004 driver(1,std::string("slcan0"),1000000,"/data/home/ne89hex/rovi_code/rovi_ws/src/driver/rovi_motor_drivers/faulhaber_mc5004_can/config/605.0121.01-H.eds");
+rovi_motor_drivers::motor_driver_mc5004 driver;
 
 void cbVelocity(const std_msgs::Float64::ConstPtr &msg)
 {
@@ -61,14 +62,21 @@ int main(int argc, char** argv)
     signal(SIGKILL, exit_handler);
 
     ros::init(argc, argv, "mc_5004_test");
-    ros::NodeHandle nh;
+    ros::NodeHandle nh("/gripper_hw_interface/faulhaber_mc5004_can");
+
+    driver = rovi_motor_drivers::motor_driver_mc5004(nh);
 
     uint16_t temp = static_cast<uint16_t>(7);
 
 
-    driver.open();
+    if(!driver.open()) {
+        ros::shutdown();
+        ROS_ERROR_STREAM("Cannot open device");
+        return 0;
+    }
 
-    driver.resetFromErrorState();
+
+    //driver.resetFromErrorState();
 
 
     driver.perform_homing();
@@ -102,8 +110,8 @@ int main(int argc, char** argv)
     ros::Publisher joint_state_pub = nh.advertise<sensor_msgs::JointState>("gripper/joint_state", 1000);
     ros::Rate loop_rate(500);
 
-    ros::Subscriber sub_vel = nh.subscribe("velocity", 1000, cbVelocity);
-    ros::Subscriber sub_pos = nh.subscribe("position", 1000, cbPosition);
+    ros::Subscriber sub_vel = nh.subscribe("/cmd_gripper_velocity", 1000, cbVelocity);
+    ros::Subscriber sub_pos = nh.subscribe("/cmd_gripper_position", 1000, cbPosition);
 
 
     sensor_msgs::JointState js;
