@@ -7,10 +7,9 @@ add_definitions(-std=c++11)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED
+find_package(catkin REQUIRED COMPONENTS
         roscpp
         rospy
-        serial
         rovi_motor_driver
         kacanopen
         )
@@ -58,9 +57,9 @@ include_directories(
 )
 
 ## Declare a C++ library
-add_library(${PROJECT_NAME}
-        src/motor_driver_mc5004.cpp
-        )
+#add_library(${PROJECT_NAME}
+#        src/motor_driver_mc5004.cpp
+#        )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -87,7 +86,7 @@ add_executable(${PROJECT_NAME}_main_test
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_main_test
-        ${PROJECT_NAME}
+        #${PROJECT_NAME}
         ${catkin_LIBRARIES}
         ${Boost_LIBRARIES}
         )

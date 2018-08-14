@@ -2,6 +2,7 @@
 // Created by cschuwerk on 11/13/17.
 //
 
+#include <sdo_error.h>
 #include "faulhaber_mc5004_can/motor_driver_mc5004.h"
 
 
@@ -13,6 +14,7 @@ namespace rovi_motor_drivers {
 
     motor_driver_mc5004::motor_driver_mc5004() {
         //ROS_INFO_STREAM_NAMED(this->name, "No device name and baudrate specified. Using slcan0 and 500000.");
+
     }
 
     motor_driver_mc5004::motor_driver_mc5004(unsigned int nodeid, std::string busname, unsigned int baudrate) :
@@ -34,6 +36,7 @@ namespace rovi_motor_drivers {
         std::string eds_file;
         int error = 0;
 
+        mutex_can.reset(new std::mutex);
 
         if(!nh.getParam("nodeid", nodeid)) error++;
         if(!nh.getParam("baudrate", baudrate)) error++;
@@ -72,9 +75,9 @@ namespace rovi_motor_drivers {
         this->device = NULL;
         this->master = new kaco::Master();
 
-        this->max_acceleration = 0;
-        this->max_deceleration = 0;
-        this->max_velocity = 0;
+        this->profile_std_acceleration = 0;
+        this->profile_std_deceleration = 0;
+        this->profile_std_velocity = 0;
 
         this->uc = mc_5004_unit_conversion();
 
@@ -157,18 +160,23 @@ namespace rovi_motor_drivers {
             }
 
 
-            // Read the max_velocity and max_acceleration registers
-            this->max_velocity = device->get_entry("max_motor_speed");
-            this->max_acceleration =  device->get_entry("max_acceleration");
-            this->max_deceleration =  device->get_entry("max_deceleration");
-            ROS_INFO_STREAM_NAMED(this->name,"max_velocity: " << this->max_velocity << " max_acceleration: " << this->max_acceleration << " max_deceleration: " << this->max_deceleration);
+            // Read the profile_std_velocity and profile_std_acceleration registers
+            this->profile_std_velocity = device->get_entry("profile_velocity");
+            this->profile_std_acceleration =  device->get_entry("profile_acceleration");
+            this->profile_std_deceleration =  device->get_entry("profile_deceleration");
+            ROS_INFO_STREAM_NAMED(this->name,"profile_std_velocity: " << uc.vel_Faulhaber_to_SI(this->profile_std_velocity) << " profile_std_acceleration: " << uc.vel_Faulhaber_to_SI(this->profile_std_acceleration) << " profile_std_deceleration: " << uc.vel_Faulhaber_to_SI(this->profile_std_deceleration));
 
 
             // Add the PDO mappings:
+            device->add_receive_pdo_mapping(0x0180+this->nodeid, "statusword", 0);
             device->add_receive_pdo_mapping(0x0280+this->nodeid, "position_actual_value", 0);
             device->add_receive_pdo_mapping(0x0280+this->nodeid, "velocity_actual_value", 4);
             device->add_receive_pdo_mapping(0x0380+this->nodeid, "torque_actual_value", 0);
             device->add_receive_pdo_mapping(0x0380+this->nodeid, "current_actual_value", 2);
+
+            device->add_transmit_pdo_mapping(0x300+this->nodeid,{{"controlword", 0}, {"target_position", 2}});
+            device->add_transmit_pdo_mapping(0x400+this->nodeid,{{"controlword", 0}, {"target_velocity", 2}});
+            device->add_transmit_pdo_mapping(0x500+this->nodeid,{{"profile_velocity", 0}, {"profile_acceleration", 4}});
 
             // Reset from (potential) previous fault and also enable operation
             this->resetFromErrorState();
@@ -189,6 +197,7 @@ namespace rovi_motor_drivers {
             // This is required to convert the Faulhaber units to real world SI units
             uint16_t rated_current = this->device->get_entry((uint16_t) 0x2329, (uint8_t) 0x01, kaco::ReadAccessMethod::sdo);
             double r_current = static_cast<double>(rated_current); // This is the rated current in mA
+            this->rated_current = r_current/1000;
             ROS_INFO_STREAM_NAMED(this->name,"The rated current for the motor is: " << r_current << "mA");
             this->uc._current_SI_to_Faulhaber = this->uc._torque_SI_to_Faulhaber = 1000 / r_current;
         }
@@ -211,7 +220,9 @@ namespace rovi_motor_drivers {
 
 
     void motor_driver_mc5004::stop() {
-        this->device->execute("set_controlword_flag", "controlword_halt"); // halt
+        std::lock_guard<std::mutex> lock(*mutex_can);
+        //this->device->execute("set_controlword_flag", "controlword_halt"); // halt
+        this->setFlag("controlword_halt", kaco::WriteAccessMethod::pdo);
         //this->device->execute("unset_controlword_flag", "controlword_halt"); // halt
     }
 
@@ -219,6 +230,7 @@ namespace rovi_motor_drivers {
         if(device==NULL) return false;
 
         try {
+            std::lock_guard<std::mutex> lock(*mutex_can);
             device->execute("set_controlword_flag", "controlword_switch_on");
             ROS_WARN_STREAM_NAMED(this->name, "Driver switch on!");
         } catch (std::exception &e) {
@@ -231,6 +243,7 @@ namespace rovi_motor_drivers {
         if(device==NULL) return false;
 
         try {
+            std::lock_guard<std::mutex> lock(*mutex_can);
             device->execute("unset_controlword_flag", "controlword_switch_on");
             ROS_WARN_STREAM_NAMED(this->name, "Driver shut down executed!");
         } catch (std::exception &e) {
@@ -243,6 +256,7 @@ namespace rovi_motor_drivers {
         if(device==NULL) return false;
 
         try {
+            std::lock_guard<std::mutex> lock(*mutex_can);
             device->execute("unset_controlword_flag", "controlword_enable_operation");
             ROS_INFO_STREAM_NAMED(this->name, "Motor driver disabled!");
             return true;
@@ -256,6 +270,7 @@ namespace rovi_motor_drivers {
         if(device==NULL) return false;
 
         try {
+            std::lock_guard<std::mutex> lock(*mutex_can);
             this->device->execute("enable_operation");
             ROS_INFO_STREAM_NAMED(this->name, "Motor driver enabled!");
             return true;
@@ -271,7 +286,9 @@ namespace rovi_motor_drivers {
         if(device==NULL) return false;
 
         try {
-            device->execute("unset_controlword_flag", "controlword_quick_stop");
+            std::lock_guard<std::mutex> lock(*mutex_can);
+            //device->execute("unset_controlword_flag", "controlword_quick_stop");
+            this->unsetFlag("controlword_quick_stop", kaco::WriteAccessMethod::pdo);
             ROS_WARN_STREAM_NAMED(this->name, "Quick stop executed!");
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "quick_stop(): " << e.what());
@@ -289,7 +306,6 @@ namespace rovi_motor_drivers {
 
 
     cfgPID motor_driver_mc5004::getPositionPID(void) {
-
 
         return cfgPID();
     }
@@ -315,9 +331,12 @@ namespace rovi_motor_drivers {
             return;
         }
         try {
-            this->device->execute("unset_controlword_flag", "controlword_halt");
-            this->device->execute("set_controlword_flag", "controlword_pp_change_set_immediately"); // Old position commands are skipped and the new one is executed immediately
-            this->device->execute("set_target_position", (signed) uc.pos_SI_to_Faulhaber(p)); // Use the macro to set all the flags required for the position modes
+            std::lock_guard<std::mutex> lock(*mutex_can);
+            this->unsetFlag("controlword_halt", kaco::WriteAccessMethod::cache);
+            this->setFlag("controlword_pp_change_set_immediately", kaco::WriteAccessMethod::cache); // Old position commands are skipped and the new one is executed immediately
+            this->device->set_entry("target_position", (signed) uc.pos_SI_to_Faulhaber(p),kaco::WriteAccessMethod::cache);
+            this->setFlag("controlword_pp_new_set_point",kaco::WriteAccessMethod::pdo);
+            this->unsetFlag("controlword_pp_new_set_point",kaco::WriteAccessMethod::pdo);
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "setPosition("<<(signed) p<<"): " << e.what());
             return;
@@ -325,40 +344,36 @@ namespace rovi_motor_drivers {
     }
 
     void motor_driver_mc5004::setPosition(double p, double v) {
-        if(device==NULL) return;
+        if(device==nullptr) return;
 
-        uint32_t vel = (uint32_t) std::fabs(uc.vel_SI_to_Faulhaber(v));
+        auto vel = (uint32_t) std::fabs(uc.vel_SI_to_Faulhaber(v));
 
-        vel = boost::algorithm::clamp(vel, 1, this->max_velocity);
+        vel = boost::algorithm::clamp(vel, 1, this->profile_std_velocity);
         try {
-            this->device->set_entry("profile_velocity", vel, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_velocity", vel, kaco::WriteAccessMethod::cache);
             this->setPosition(p);
-            this->device->set_entry("profile_velocity", this->max_velocity, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_velocity", this->profile_std_velocity, kaco::WriteAccessMethod::cache);
 
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "setPosition(p,v): " << e.what(););
         }
-
-        return;
     }
 
     void motor_driver_mc5004::setPosition(double p, double v, double a) {
         if(device==NULL) return;
 
-        uint32_t acc = (uint32_t) std::fabs(a);
-        acc = boost::algorithm::clamp(acc, 1, this->max_acceleration);
+        auto acc = (uint32_t) std::fabs(uc.vel_SI_to_Faulhaber(a));
+        acc = boost::algorithm::clamp(acc, 1, this->profile_std_acceleration);
         try {
-            this->device->set_entry("profile_acceleration", acc, kaco::WriteAccessMethod::use_default);
-            this->device->set_entry("profile_deceleration", acc, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_acceleration", acc, kaco::WriteAccessMethod::cache);
+            this->device->set_entry("profile_deceleration", acc, kaco::WriteAccessMethod::cache);
             this->setPosition(p,v);
-            this->device->set_entry("profile_acceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
-            this->device->set_entry("profile_deceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_acceleration", this->profile_std_acceleration, kaco::WriteAccessMethod::cache);
+            this->device->set_entry("profile_deceleration", this->profile_std_acceleration, kaco::WriteAccessMethod::cache);
 
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "setPosition(p,v,a): " << e.what(););
         }
-
-        return;
     }
 
 
@@ -370,7 +385,6 @@ namespace rovi_motor_drivers {
             this->sendSyncMessage();
             const int32_t velocity = this->device->get_entry("velocity_actual_value", kaco::ReadAccessMethod::cache);
             return uc.vel_Faulhaber_to_SI((double)velocity);
-
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "getVelocity(): " << e.what());
             return NAN;
@@ -385,12 +399,14 @@ namespace rovi_motor_drivers {
             return;
         }
         try {
-            this->device->execute("unset_controlword_flag", "controlword_halt");
-            this->device->execute("set_controlword_flag", "controlword_pp_change_set_immediately"); // Old velocity commands are skipped and the new one is executed immediately
-            this->device->set_entry("target_velocity", (signed) uc.vel_SI_to_Faulhaber(v));
-        } catch (std::exception &e) {
+            std::lock_guard<std::mutex> lock(*mutex_can);
+            this->unsetFlag("controlword_halt", kaco::WriteAccessMethod::pdo);
+            this->device->set_entry("target_velocity", (signed) uc.vel_SI_to_Faulhaber(v),kaco::WriteAccessMethod::pdo);
+        } catch (kaco::sdo_error &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "setVelocity("<<(signed) v<<"): " << e.what());
-            return;
+        }
+        catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setVelocity("<<(signed) v<<"): " << e.what());
         }
     }
 
@@ -398,19 +414,17 @@ namespace rovi_motor_drivers {
         if(device==NULL) return;
 
         uint32_t acc = (uint32_t) std::fabs(a);
-        acc = boost::algorithm::clamp(acc, 1, this->max_acceleration);
+        acc = boost::algorithm::clamp(acc, 1, this->profile_std_acceleration);
         try {
-            this->device->set_entry("profile_acceleration", acc, kaco::WriteAccessMethod::use_default);
-            this->device->set_entry("profile_deceleration", acc, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_acceleration", acc, kaco::WriteAccessMethod::cache);
+            this->device->set_entry("profile_deceleration", acc, kaco::WriteAccessMethod::cache);
             this->setVelocity(v);
-            this->device->set_entry("profile_acceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
-            this->device->set_entry("profile_deceleration", this->max_acceleration, kaco::WriteAccessMethod::use_default);
+            this->device->set_entry("profile_acceleration", this->profile_std_acceleration, kaco::WriteAccessMethod::cache);
+            this->device->set_entry("profile_deceleration", this->profile_std_acceleration, kaco::WriteAccessMethod::cache);
 
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "setPosition(p,v,a): " << e.what(););
         }
-
-        return;
     }
 
     bool motor_driver_mc5004::setVelocityPID(cfgPID &cfg) {
@@ -467,6 +481,7 @@ namespace rovi_motor_drivers {
         if(device == NULL) return cfgPID();
 
         try {
+            std::lock_guard<std::mutex> lock(*mutex_can);
             rovi_motor_drivers::cfgPID cfg;
             cfg.p = device->get_entry((uint16_t) 0x2342, (uint8_t) 0x01, kaco::ReadAccessMethod::use_default);
             cfg.i = device->get_entry((uint16_t) 0x2342, (uint8_t) 0x02, kaco::ReadAccessMethod::use_default);
@@ -484,6 +499,7 @@ namespace rovi_motor_drivers {
         if(device == NULL) return false;
 
         try {
+            std::lock_guard<std::mutex> lock(*mutex_can);
             device->set_entry("controlword", (uint16_t) 0x0008); // fault-reset
             device->set_entry("controlword", (uint16_t) 0x0006); // shut-down
             device->set_entry("controlword", (uint16_t) 0x000F); // enable_operation operation
@@ -503,6 +519,7 @@ namespace rovi_motor_drivers {
         if(control_mode == "" || control_mode.empty()) return false;
 
         try {
+            std::lock_guard<std::mutex> lock(*mutex_can);
             device->set_entry("modes_of_operation", device->get_constant(control_mode));
             this->control_mode = control_mode;
             ROS_INFO_STREAM_NAMED(this->name, "Set the control mode to: " << control_mode);
@@ -523,8 +540,7 @@ namespace rovi_motor_drivers {
 
         try {
             this->sendSyncMessage();
-            uint16_t statusword = device->get_entry("statusword");
-
+            uint16_t statusword = device->get_entry("statusword", kaco::ReadAccessMethod::cache);
             return static_cast<int16_t>(statusword & 255);
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
@@ -609,6 +625,7 @@ namespace rovi_motor_drivers {
 
     void motor_driver_mc5004::sendSyncMessage(void) {
 
+        std::lock_guard<std::mutex> lock(*mutex_can);
         kaco::Message sync_msg;
         //sync_msg.cob_id = 0x0281;
         sync_msg.cob_id = 0x080;
@@ -636,9 +653,57 @@ namespace rovi_motor_drivers {
             ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
         }
         return current_state;
-        //ROS_INFO_STREAM(current_state.position << " " << current_state.velocity << " " << current_state.torque << " " << current_state.velocity);
     }
 
+    void motor_driver_mc5004::setFlag(std::string flag_name, kaco::WriteAccessMethod method) {
+        try {
+            const uint16_t cw = this->device->get_entry("controlword", kaco::ReadAccessMethod::cache);
+            const uint16_t flag = this->device->get_constant(flag_name);
+            this->device->set_entry("controlword", static_cast<uint16_t>(cw | flag), method);
+        }
+        catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setFlag(): " << e.what());
+        }
+    }
 
+    void motor_driver_mc5004::unsetFlag(std::string flag_name, kaco::WriteAccessMethod method) {
+        try {
+            const uint16_t cw = this->device->get_entry("controlword", kaco::ReadAccessMethod::cache);
+            const uint16_t flag = this->device->get_constant(flag_name);
+            this->device->set_entry("controlword", static_cast<uint16_t>(cw & ~flag), method);
+        }
+        catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setFlag(): " << e.what());
+        }
+    }
+
+    void motor_driver_mc5004::setTorqueLimits(double pos_limit, double neg_limit) {
+
+        if(pos_limit <= 0.0 || neg_limit >= 0.0) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setTorqueLimits(): the specified pos. torque limit <= 0  or neg. torque limit >= 0");
+        }
+
+        try {
+            this->device->set_entry("positive_torque_limit_value", static_cast<uint16_t>(pos_limit/this->rated_current*1000), kaco::WriteAccessMethod::sdo);
+            this->device->set_entry("positive_torque_limit_value", static_cast<uint16_t>(-neg_limit/this->rated_current*1000), kaco::WriteAccessMethod::sdo);
+        }
+        catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "setTorqueLimits(): " << e.what());
+        }
+    }
+
+    bool motor_driver_mc5004::getTargetReached(void) {
+
+        if(device==NULL) return false;
+
+        try {
+            return static_cast<bool>((uint16_t) device->get_entry("statusword", kaco::ReadAccessMethod::cache) & (uint16_t) device->get_constant("statusword_target_reached"));
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
+            return false;
+        }
+
+        return false;
+    }
 
 }

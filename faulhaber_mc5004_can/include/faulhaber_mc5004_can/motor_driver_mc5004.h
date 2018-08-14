@@ -5,13 +5,12 @@
 #ifndef ROVI_MOTOR_DRIVER_MC5004_H
 #define ROVI_MOTOR_DRIVER_MC5004_H
 
-#include "rovi_motor_driver/motor_driver.h"
+#include <mutex>
 #include <iostream>
 #include <ros/ros.h>
-#include <serial/serial.h>
 #include "master.h"
 #include <boost/algorithm/clamp.hpp>
-
+#include "rovi_motor_driver/motor_driver.h"
 
 namespace rovi_motor_drivers {
 
@@ -127,9 +126,23 @@ namespace rovi_motor_drivers {
         bool status_found_device402;
         bool status_initialized;
 
-    public:
-        motor_driver_mc5004();
+        std::string name = "motor_driver_mc5004";
+        std::string control_mode; //! Always stores the current control mode of the device.
+        std::string eds_file; //! Path to the .eds file
 
+        uint32_t profile_std_acceleration;
+        uint32_t profile_std_deceleration;
+        uint32_t profile_std_velocity;
+
+        mc_5004_unit_conversion uc;
+
+        std::shared_ptr<std::mutex> mutex_can;
+
+        double rated_current; //! The rated current of the configured motor in [A]
+
+    public:
+
+        motor_driver_mc5004();
 
         motor_driver_mc5004(ros::NodeHandle &nh);
 
@@ -376,11 +389,6 @@ namespace rovi_motor_drivers {
          */
         void debugDeviceStatus(void);
 
-        /**
-         * Send a sync message on the CAN bus.
-         * Depending on the PDO configuration of the driver, the driver responds with the TxPDOs.
-         */
-        void sendSyncMessage(void);
 
         /**
          * Read the motor state from the Faulhaber controller (position, velocity, torque, current).
@@ -390,19 +398,41 @@ namespace rovi_motor_drivers {
         motor_state getMotorState(void);
 
 
+        /**
+         * Set the torque limits on the Faulhaber MC 5004 motor driver (in A).
+         * The torque limit (i.e. the current limit) is converted into the relative units (related to the rated current) used by the Faulhaber MC 5004,
+         * i.e. internally the Faulhaber controller uses a value of "2000" to denote a max. torque/current as of twice the rated current.
+         * @param pos_limit Positive torque limit (required to be > 0)
+         * @param neg_limit Negative torque limit (required to be < 0)
+         */
+        void setTorqueLimits(double pos_limit, double neg_limit);
+
+
+        bool getTargetReached(void);
+
+
 
     private:
 
-        std::string name = "motor_driver_mc5004";
-        std::string control_mode; //! Always stores the current control mode of the device.
-        std::string eds_file; //! Path to the .eds file
+        /**
+         * Send a sync message on the CAN bus.
+         * Depending on the PDO configuration of the driver, the driver responds with the TxPDOs.
+         */
+        void sendSyncMessage(void);
 
-        uint32_t max_acceleration;
-        uint32_t max_deceleration;
-        uint32_t max_velocity;
+        /**
+         * Set a flag in the control word.
+         * @param flag_name The name of the flag (i.e. constant) (see the device profile constants in kacanopen/master/src/profiles.cpp)
+         * @param method The write method on the CAN bus
+         */
+        void setFlag(std::string flag_name, kaco::WriteAccessMethod method = kaco::WriteAccessMethod::use_default);
 
-
-        mc_5004_unit_conversion uc;
+        /**
+         * Unset a flag in the control word.
+         * @param flag_name The name of the flag (i.e. constant) (see the device profile constants in kacanopen/master/src/profiles.cpp)
+         * @param method The write method on the CAN bus
+         */
+        void unsetFlag(std::string flag_name, kaco::WriteAccessMethod method = kaco::WriteAccessMethod::use_default);
 
 
     };

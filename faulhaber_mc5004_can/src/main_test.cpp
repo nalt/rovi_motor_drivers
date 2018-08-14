@@ -19,11 +19,13 @@ void cbVelocity(const std_msgs::Float64::ConstPtr &msg)
         driver.setControlMode("profile_velocity_mode");
 
     ROS_INFO_STREAM("Received vel command" << msg->data);
-    if(msg->data == 0.0) driver.stop();
-    if(msg->data == 1.0) driver.disable_operation();
-    if(msg->data == 2.0) driver.enable_operation();
-    if(msg->data == 3.0) { driver.quick_stop(); driver.resetFromErrorState(); }
-    else driver.setVelocity(msg->data, 100);
+    /*if(msg->data == 0.0) driver.stop();
+    else if(msg->data == 1.0) driver.disable_operation();
+    else if(msg->data == 2.0) driver.enable_operation();
+    else if(msg->data == 3.0) { driver.quick_stop(); driver.resetFromErrorState(); }
+    else driver.setVelocity(msg->data);*/
+    double vel = msg->data;
+    driver.setVelocity(msg->data);
 }
 
 void cbPosition(const std_msgs::Float64::ConstPtr &msg)
@@ -34,11 +36,15 @@ void cbPosition(const std_msgs::Float64::ConstPtr &msg)
     }
 
     ROS_INFO_STREAM("Received pos command" << msg->data);
+
+    /*
     if(msg->data == 0.0) driver.stop();
-    if(msg->data == 1.0) driver.disable_operation();
-    if(msg->data == 2.0) driver.enable_operation();
-    if(msg->data == 3.0) { driver.quick_stop(); driver.resetFromErrorState(); }
-    else driver.setPosition(msg->data, 25000, 500);
+    else if(msg->data == 1.0) driver.disable_operation();
+    else if(msg->data == 2.0) driver.enable_operation();
+    else if(msg->data == 3.0) { driver.quick_stop(); driver.resetFromErrorState(); }
+    else driver.setPosition(msg->data, 25000, 500);*/
+
+    driver.setPosition(msg->data, 0.010, 0.00005);
 }
 
 void exit_handler (int param)
@@ -78,6 +84,7 @@ int main(int argc, char** argv)
 
     //driver.resetFromErrorState();
 
+    driver.setTorqueLimits(2000, 3000);
 
     driver.perform_homing();
 
@@ -107,7 +114,7 @@ int main(int argc, char** argv)
     //driver.setVelocity(0);
 
     ros::Publisher chatter_pub = nh.advertise<std_msgs::Float64>("state_position", 1000);
-    ros::Publisher joint_state_pub = nh.advertise<sensor_msgs::JointState>("gripper/joint_state", 1000);
+    ros::Publisher joint_state_pub = nh.advertise<sensor_msgs::JointState>("/joint_states", 1000);
     ros::Rate loop_rate(500);
 
     ros::Subscriber sub_vel = nh.subscribe("/cmd_gripper_velocity", 1000, cbVelocity);
@@ -150,7 +157,7 @@ int main(int argc, char** argv)
 
         //driver.getTorquePID();
 
-        chatter_pub.publish(msg);
+        //chatter_pub.publish(msg);
         joint_state_pub.publish(js);
 
         ros::spinOnce();
