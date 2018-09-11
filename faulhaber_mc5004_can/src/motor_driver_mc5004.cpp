@@ -203,7 +203,8 @@ namespace rovi_motor_drivers {
             double r_current = static_cast<double>(rated_current); // This is the rated current in mA
             this->rated_current = r_current/1000;
             ROS_INFO_STREAM_NAMED(this->name,"The rated current for the motor is: " << r_current << "mA");
-            this->uc._current_SI_to_Faulhaber = this->uc._torque_SI_to_Faulhaber = 1000 / r_current;
+
+            this->uc._current_SI_to_Faulhaber = this->uc._torque_SI_to_Faulhaber = 1000.0 / this->rated_current;
 
             // Register a heartbeat callback
             kaco::NMT::DeviceAliveCallback device_alive_callback_functional = std::bind(&motor_driver_mc5004::cbHeartbeatMsg, this, std::placeholders::_1);
@@ -628,13 +629,18 @@ namespace rovi_motor_drivers {
             i++;
         }
 
-        // Stop the homing and reset the operation mode
+        // Stop the homing
         device->execute("unset_controlword_flag","controlword_hm_operation_start");
-        device->set_entry("operation_mode_options",op_mode_orig);
-        this->stop();
 
-        // Set the original control mode again
+        // Move the gripper slightly away from the from the hard contact
+        this->setControlMode("profile_position_mode");
+        this->setPosition(0.0155);
+        ros::Duration(0.5).sleep();
+
+        // Set the original control mode again, and reset the operation mode
+        device->set_entry("operation_mode_options",op_mode_orig);
         this->setControlMode(control_mode_orig);
+        this->stop();
 
         if(success)
             ROS_INFO_STREAM_NAMED(this->name, "perform_homing(): Homing is finished!");
@@ -665,11 +671,11 @@ namespace rovi_motor_drivers {
             int32_t pos = this->device->get_entry("position_actual_value", kaco::ReadAccessMethod::cache);
             int32_t vel = this->device->get_entry("velocity_actual_value", kaco::ReadAccessMethod::cache);
             int16_t torque = this->device->get_entry("torque_actual_value", kaco::ReadAccessMethod::cache);
-            int16_t currrent = this->device->get_entry("current_actual_value", kaco::ReadAccessMethod::cache);
+            int16_t current = this->device->get_entry("current_actual_value", kaco::ReadAccessMethod::cache);
             current_state.position = uc.pos_Faulhaber_to_SI(static_cast<double>(pos));
             current_state.velocity = uc.vel_Faulhaber_to_SI(static_cast<double>(vel));
             current_state.torque   = uc.torque_Faulhaber_to_SI(static_cast<double>(torque));
-            current_state.current  = uc.current_Faulhaber_to_SI(static_cast<double>(currrent));
+            current_state.current  = uc.current_Faulhaber_to_SI(static_cast<double>(current));
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
         }
