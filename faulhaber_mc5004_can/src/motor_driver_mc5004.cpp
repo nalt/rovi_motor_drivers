@@ -36,6 +36,10 @@ namespace rovi_motor_drivers {
         std::string eds_file;
         int error = 0;
 
+        this->status_initialized = false;
+        this->status_found_device402 = false;
+        this->status_timeout_occured = false;
+
         mutex_can.reset(new std::mutex);
 
         if(!nh.getParam("nodeid", nodeid)) error++;
@@ -52,6 +56,7 @@ namespace rovi_motor_drivers {
 
         // Device configuration file
         nh.getParam("eds_file", this->eds_file);
+        nh.getParam("heartbeat_timeout", this->heartbeat_timeout);
 
         this->init();
 
@@ -192,7 +197,6 @@ namespace rovi_motor_drivers {
                 this->debugDeviceStatus();
             }
 
-
             // Read the motor data from the controller, especially the rated current for the motor
             // This is required to convert the Faulhaber units to real world SI units
             uint16_t rated_current = this->device->get_entry((uint16_t) 0x2329, (uint8_t) 0x01, kaco::ReadAccessMethod::sdo);
@@ -200,6 +204,16 @@ namespace rovi_motor_drivers {
             this->rated_current = r_current/1000;
             ROS_INFO_STREAM_NAMED(this->name,"The rated current for the motor is: " << r_current << "mA");
             this->uc._current_SI_to_Faulhaber = this->uc._torque_SI_to_Faulhaber = 1000 / r_current;
+
+            // Register a heartbeat callback
+            kaco::NMT::DeviceAliveCallback device_alive_callback_functional = std::bind(&motor_driver_mc5004::cbHeartbeatMsg, this, std::placeholders::_1);
+            this->master->core.nmt.register_device_alive_callback(device_alive_callback_functional);
+
+            // Setup a timer to check if the motor driver is alive
+            ros::NodeHandle nh;
+            this->heartbeat_timer = nh.createTimer(ros::Duration(heartbeat_timeout), &motor_driver_mc5004::cbHeartbeatTimeout, this, true);
+
+            this->status_initialized = true;
         }
 
         return true;
@@ -500,9 +514,16 @@ namespace rovi_motor_drivers {
 
         try {
             std::lock_guard<std::mutex> lock(*mutex_can);
+
             device->set_entry("controlword", (uint16_t) 0x0008); // fault-reset
+            ros::Duration(0.1).sleep();
+
             device->set_entry("controlword", (uint16_t) 0x0006); // shut-down
+            ros::Duration(0.1).sleep();
+
             device->set_entry("controlword", (uint16_t) 0x000F); // enable_operation operation
+            ros::Duration(0.1).sleep();
+
             ROS_INFO_STREAM_NAMED(this->name, "Reset from error state performed");
             return true;
         } catch (std::exception &e) {
@@ -680,7 +701,7 @@ namespace rovi_motor_drivers {
     void motor_driver_mc5004::setTorqueLimits(double pos_limit, double neg_limit) {
 
         if(pos_limit <= 0.0 || neg_limit >= 0.0) {
-            ROS_ERROR_STREAM_NAMED(this->name, "setTorqueLimits(): the specified pos. torque limit <= 0  or neg. torque limit >= 0");
+            ROS_ERROR_STREAM_NAMED(this->name, "setTorqueLimits(): the specified pos. torque limit <= 0 ("<<pos_limit<<")  or neg. torque limit >= 0 ("<<neg_limit<<")");
         }
 
         try {
@@ -704,6 +725,35 @@ namespace rovi_motor_drivers {
         }
 
         return false;
+    }
+
+    void motor_driver_mc5004::cbHeartbeatMsg(const uint8_t node_id) {
+
+        if(!status_timeout_occured) {
+            this->heartbeat_timer.setPeriod(ros::Duration(this->heartbeat_timeout), true);
+            return;
+        }
+        else {
+            ROS_INFO_STREAM("Restarting the device and homing it:");
+            status_timeout_occured = false;
+            this->master->stop();
+            this->master->start(busname, rovi_motor_drivers::cfg_baudrate_kacanopen::map.at(this->baudrate));
+            this->device->start();
+            this->resetFromErrorState();
+            this->perform_homing();
+
+        }
+
+    }
+
+    void motor_driver_mc5004::cbHeartbeatTimeout(const ros::TimerEvent &) {
+
+        // If no heartbeat message has been received and a timeout happened:
+        ROS_ERROR_STREAM("Timeout: no heartbeat message received for more than "<< this->heartbeat_timeout << " seconds.");
+
+        this->status_timeout_occured = true;
+
+        this->heartbeat_timer.setPeriod(ros::Duration(this->heartbeat_timeout), true);
     }
 
 }

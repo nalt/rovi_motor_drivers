@@ -84,7 +84,7 @@ int main(int argc, char** argv)
 
     //driver.resetFromErrorState();
 
-    driver.setTorqueLimits(2000, 3000);
+    //driver.setTorqueLimits(3000, 3000);
 
     driver.perform_homing();
 

@@ -125,6 +125,7 @@ namespace rovi_motor_drivers {
 
         bool status_found_device402;
         bool status_initialized;
+        bool status_timeout_occured;
 
         std::string name = "motor_driver_mc5004";
         std::string control_mode; //! Always stores the current control mode of the device.
@@ -414,6 +415,9 @@ namespace rovi_motor_drivers {
 
     private:
 
+        ros::Timer heartbeat_timer;
+        double heartbeat_timeout;
+
         /**
          * Send a sync message on the CAN bus.
          * Depending on the PDO configuration of the driver, the driver responds with the TxPDOs.
@@ -434,6 +438,9 @@ namespace rovi_motor_drivers {
          */
         void unsetFlag(std::string flag_name, kaco::WriteAccessMethod method = kaco::WriteAccessMethod::use_default);
 
+
+        void cbHeartbeatMsg(const uint8_t node_id);
+        void cbHeartbeatTimeout(const ros::TimerEvent&);
 
     };
 
