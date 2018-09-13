@@ -383,7 +383,9 @@ namespace rovi_motor_drivers {
          * See page 18 in the Faulhaber documentation of the drive modes.
          * @return The current status.
          */
-        int getDeviceStatus();
+        int getDeviceStatus(kaco::ReadAccessMethod accessMethod = kaco::ReadAccessMethod::cache);
+
+        std::string getDeviceStatusString(kaco::ReadAccessMethod accessMethod = kaco::ReadAccessMethod::cache);
 
         /**
          * Print the current device status to the command line to debug the driver/communication.

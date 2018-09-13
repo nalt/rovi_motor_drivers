@@ -46,17 +46,17 @@ namespace rovi_motor_drivers {
         if(!nh.getParam("baudrate", baudrate)) error++;
         if(!nh.getParam("device", busname)) error++;
 
+        // Device configuration file
+        if(!nh.getParam("eds_file", this->eds_file)) error++;
+        if(!nh.getParam("heartbeat_timeout", this->heartbeat_timeout)) error++;
+
         if(error>0) {
-            ROS_ERROR_STREAM_NAMED(this->name, "Required parameters nodeid, baudrate and device are not set!");
+            ROS_ERROR_STREAM_NAMED(this->name, "Required parameters nodeid, baudrate, eds_file, heartbeat_timeout and device are not set!");
             ros::shutdown();
         }
         this->nodeid = (unsigned int) nodeid;
         this->baudrate = (unsigned int) baudrate;
         this->busname = busname;
-
-        // Device configuration file
-        nh.getParam("eds_file", this->eds_file);
-        nh.getParam("heartbeat_timeout", this->heartbeat_timeout);
 
         this->init();
 
@@ -170,7 +170,6 @@ namespace rovi_motor_drivers {
             this->profile_std_acceleration =  device->get_entry("profile_acceleration");
             this->profile_std_deceleration =  device->get_entry("profile_deceleration");
             ROS_INFO_STREAM_NAMED(this->name,"profile_std_velocity: " << uc.vel_Faulhaber_to_SI(this->profile_std_velocity) << " profile_std_acceleration: " << uc.vel_Faulhaber_to_SI(this->profile_std_acceleration) << " profile_std_deceleration: " << uc.vel_Faulhaber_to_SI(this->profile_std_deceleration));
-
 
             // Add the PDO mappings:
             device->add_receive_pdo_mapping(0x0180+this->nodeid, "statusword", 0);
@@ -556,18 +555,31 @@ namespace rovi_motor_drivers {
         return this->control_mode;
     }
 
-    int motor_driver_mc5004::getDeviceStatus() {
+    int motor_driver_mc5004::getDeviceStatus(kaco::ReadAccessMethod accessMethod) {
 
         if(device==NULL) return -1;
 
         try {
-            this->sendSyncMessage();
+            if(accessMethod != kaco::ReadAccessMethod::cache) {
+                this->sendSyncMessage();
+            }
+
             uint16_t statusword = device->get_entry("statusword", kaco::ReadAccessMethod::cache);
             return static_cast<int16_t>(statusword & 255);
         } catch (std::exception &e) {
             ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
             return -1;
         }
+    }
+
+
+    std::string motor_driver_mc5004::getDeviceStatusString(kaco::ReadAccessMethod accessMethod) {
+        uint16_t status = this->getDeviceStatus(accessMethod);
+        try {
+            std::string device_mode_str = rovi_motor_drivers::mc5004_device_status::map.at(status);
+            return device_mode_str;
+        } catch (std::exception &e) {}
+        return std::string("Unknown device status code");
     }
 
 
