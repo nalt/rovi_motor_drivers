@@ -187,7 +187,7 @@ namespace rovi_motor_drivers {
             ros::Duration(0.2).sleep(); // wait for some time for the motor driver to reset and enable again
 
             // Check if the motor driver is ready to receive commands:
-            int s = this->getDeviceStatus();
+            int s = this->getDeviceStatus(kaco::ReadAccessMethod::sdo);
             if(s==39) {
                 ROS_INFO_STREAM_NAMED(this->name,"The motor was enabled and is now in state: " << rovi_motor_drivers::mc5004_device_status::map.at(s));
             }
@@ -212,7 +212,6 @@ namespace rovi_motor_drivers {
             // Setup a timer to check if the motor driver is alive
             ros::NodeHandle nh;
             this->heartbeat_timer = nh.createTimer(ros::Duration(heartbeat_timeout), &motor_driver_mc5004::cbHeartbeatTimeout, this, true);
-
             this->status_initialized = true;
         }
 
@@ -515,7 +514,16 @@ namespace rovi_motor_drivers {
         try {
             std::lock_guard<std::mutex> lock(*mutex_can);
 
-            device->set_entry("controlword", (uint16_t) 0x0008); // fault-reset
+            //device->set_entry("controlword", (uint16_t) 0x0008); // fault-reset
+            //ros::Duration(0.1).sleep();
+
+            //device->set_entry("controlword", (uint16_t) 0x0006); // shut-down
+            //ros::Duration(0.1).sleep();
+
+            device->set_entry("controlword", (uint16_t) 0x000F); // enable_operation operation
+            ros::Duration(0.1).sleep();
+
+            device->set_entry("controlword", (uint16_t) 0x008F); // fault reset
             ros::Duration(0.1).sleep();
 
             device->set_entry("controlword", (uint16_t) 0x0006); // shut-down
@@ -581,6 +589,24 @@ namespace rovi_motor_drivers {
         } catch (std::exception &e) {}
         return std::string("Unknown device status code");
     }
+
+    // TODO: The Faulhaber error register is always 0x0000
+    int motor_driver_mc5004::getDeviceError(kaco::ReadAccessMethod accessMethod) {
+        if(device==NULL) return -1;
+
+        try {
+            uint16_t error_register = device->get_entry("faulhaber_error_register", accessMethod);
+            return static_cast<int16_t>(error_register & 0xffff);
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getDeviceError(): " << e.what());
+            return -1;
+        }
+    }
+
+    std::string motor_driver_mc5004::getDeviceErrorString(kaco::ReadAccessMethod accessMethod) {
+        return std::__cxx11::string();
+    }
+
 
 
 
@@ -772,6 +798,21 @@ namespace rovi_motor_drivers {
         this->status_timeout_occured = true;
 
         this->heartbeat_timer.setPeriod(ros::Duration(this->heartbeat_timeout), true);
+    }
+
+    bool motor_driver_mc5004::setParameter(const std::string &entry_name, const kaco::Value &value,
+                                           const kaco::WriteAccessMethod access_method) {
+        if(device==NULL) return false;
+
+        try {
+            this->device->set_entry(entry_name, value, access_method);
+            return true;
+        } catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "getDeviceStatus(): " << e.what());
+            return false;
+        }
+
+        return false;
     }
 
 }

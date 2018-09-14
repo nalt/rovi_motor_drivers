@@ -387,6 +387,10 @@ namespace rovi_motor_drivers {
 
         std::string getDeviceStatusString(kaco::ReadAccessMethod accessMethod = kaco::ReadAccessMethod::cache);
 
+        int getDeviceError(kaco::ReadAccessMethod accessMethod = kaco::ReadAccessMethod::sdo);
+
+        std::string getDeviceErrorString(kaco::ReadAccessMethod accessMethod = kaco::ReadAccessMethod::sdo);
+
         /**
          * Print the current device status to the command line to debug the driver/communication.
          */
@@ -409,6 +413,8 @@ namespace rovi_motor_drivers {
          * @param neg_limit Negative torque limit (required to be < 0)
          */
         void setTorqueLimits(double pos_limit, double neg_limit);
+
+        bool setParameter(const std::string& entry_name, const kaco::Value& value, const kaco::WriteAccessMethod access_method = kaco::WriteAccessMethod::use_default);
 
 
         bool getTargetReached(void);
