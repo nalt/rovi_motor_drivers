@@ -604,7 +604,22 @@ namespace rovi_motor_drivers {
     }
 
     std::string motor_driver_mc5004::getDeviceErrorString(kaco::ReadAccessMethod accessMethod) {
-        return std::__cxx11::string();
+        uint32_t error_code = getDeviceError(accessMethod);
+        std::stringstream error_sstream;
+        if(error_code & 0x0001) error_sstream << "Speed deviation error" << std::endl;
+        if(error_code & 0x0002) error_sstream << "Following error" << std::endl;
+        if(error_code & 0x0004) error_sstream << "Over voltage error" << std::endl;
+        if(error_code & 0x0008) error_sstream << "Under voltage error" << std::endl;
+        if(error_code & 0x0010) error_sstream << "Temperature warning" << std::endl;
+        if(error_code & 0x0020) error_sstream << "Temperature error" << std::endl;
+        if(error_code & 0x0040) error_sstream << "Encoder error" << std::endl;
+        if(error_code & 0x0080) error_sstream << "Internal HW error" << std::endl;
+        if(error_code & 0x0200) error_sstream << "Current measurement error" << std::endl;
+        if(error_code & 0x0800) error_sstream << "Communication error" << std::endl;
+        if(error_code & 0x1000) error_sstream << "Calc error / Software error" << std::endl;
+        if(error_code & 0x2000) error_sstream << "Dynamic limit" << std::endl;
+
+        return error_sstream.str();
     }
 
 
