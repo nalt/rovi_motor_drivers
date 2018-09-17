@@ -418,6 +418,8 @@ namespace rovi_motor_drivers {
 
 
         bool getTargetReached(void);
+//
+//        void printErrorMemory(void);
 
 
 

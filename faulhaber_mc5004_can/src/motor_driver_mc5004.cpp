@@ -583,8 +583,11 @@ namespace rovi_motor_drivers {
 
     std::string motor_driver_mc5004::getDeviceStatusString(kaco::ReadAccessMethod accessMethod) {
         uint16_t status = this->getDeviceStatus(accessMethod);
+        bool warning = status && 0x80;
+        status = status & 0x7F;
         try {
             std::string device_mode_str = rovi_motor_drivers::mc5004_device_status::map.at(status);
+            if(warning) device_mode_str.append(" (Note: warning bit is set)");
             return device_mode_str;
         } catch (std::exception &e) {}
         return std::string("Unknown device status code");
@@ -829,5 +832,14 @@ namespace rovi_motor_drivers {
 
         return false;
     }
+
+//    // TODO: How to read the sub-entries
+//    void motor_driver_mc5004::printErrorMemory() {
+//        uint8_t  num_error = this->device->get_entry("pre_defined_error_field/number_of_errors", kaco::ReadAccessMethod::sdo);
+//
+//        for(unsigned int i=0; i<num_error; i++) {
+//            uint8_t  reg = this->device->get_entry("error_register", kaco::ReadAccessMethod::sdo);
+//        }
+//    }
 
 }
