@@ -8,9 +8,10 @@
 #include <mutex>
 #include <iostream>
 #include <ros/ros.h>
-#include "master.h"
 #include <boost/algorithm/clamp.hpp>
 #include "rovi_motor_driver/motor_driver.h"
+#include "master.h"
+#include "sdo_error.h"
 
 namespace rovi_motor_drivers {
 

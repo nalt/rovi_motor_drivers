@@ -2,7 +2,6 @@
 // Created by cschuwerk on 11/13/17.
 //
 
-#include <sdo_error.h>
 #include "faulhaber_mc5004_can/motor_driver_mc5004.h"
 
 
