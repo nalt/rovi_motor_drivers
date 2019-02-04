@@ -121,6 +121,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 install(FILES
+  launch/setup_can_interface.launch
   scripts/setup_usbtin_can.sh
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
