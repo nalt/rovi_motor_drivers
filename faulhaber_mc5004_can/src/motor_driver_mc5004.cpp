@@ -244,7 +244,12 @@ namespace rovi_motor_drivers {
     void motor_driver_mc5004::stop() {
         std::lock_guard<std::mutex> lock(*mutex_can);
         //this->device->execute("set_controlword_flag", "controlword_halt"); // halt
-        this->setFlag("controlword_halt", kaco::WriteAccessMethod::pdo);
+        try {
+            this->setFlag("controlword_halt", kaco::WriteAccessMethod::pdo);
+        }
+        catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "stop(): " << e.what());
+        }
         //this->device->execute("unset_controlword_flag", "controlword_halt"); // halt
     }
 
@@ -667,9 +672,15 @@ namespace rovi_motor_drivers {
         }
 
         // Start the Homing procedure
-        device->execute("unset_controlword_flag","controlword_hm_operation_start");
-        this->setControlMode("homing_mode");
-        device->execute("set_controlword_flag","controlword_hm_operation_start");
+        try {
+            device->execute("unset_controlword_flag","controlword_hm_operation_start");
+            this->setControlMode("homing_mode");
+            device->execute("set_controlword_flag","controlword_hm_operation_start");
+        }
+        catch (std::exception &e) {
+            ROS_ERROR_STREAM_NAMED(this->name, "perform_homing(): " << e.what());
+            return false;
+        }
 
         unsigned int i=0;
 
