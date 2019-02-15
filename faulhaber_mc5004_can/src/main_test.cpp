@@ -68,7 +68,7 @@ int main(int argc, char** argv)
     signal(SIGKILL, exit_handler);
 
     ros::init(argc, argv, "mc_5004_test");
-    ros::NodeHandle nh("/gripper_hw_interface/faulhaber_mc5004_can");
+    ros::NodeHandle nh("/gripper/gripper_hw_interface/faulhaber_mc5004_can");
 
     driver = rovi_motor_drivers::motor_driver_mc5004(nh);
 
@@ -85,6 +85,8 @@ int main(int argc, char** argv)
     //driver.resetFromErrorState();
 
     //driver.setTorqueLimits(3000, 3000);
+
+    //driver.printErrorMemory();
 
     driver.perform_homing();
 

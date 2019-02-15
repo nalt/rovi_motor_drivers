@@ -124,7 +124,6 @@ namespace rovi_motor_drivers {
         for (size_t i=0; i<master->num_devices(); ++i) {
 
             device = &master->get_device(i);
-            device->start();
 
             if(this->eds_file.empty()) {
                 //device->load_dictionary_from_library(); // This is not very specific; load the .eds file instead if given
@@ -147,6 +146,17 @@ namespace rovi_motor_drivers {
 
             ROS_INFO_STREAM_NAMED(this->name,"Found CiA "<<std::dec<<(unsigned)profile<<" device with node ID "<<dev_node_id<<": "<<device->get_entry("manufacturer_device_name"));
 
+
+            try {
+                // Bugfix: load mandatory operations and constants before starting the device
+                // start() does not load them if the general EDS profiles folder eds_files.json is not found
+                device->load_operations();
+                device->load_constants();
+                device->start();
+            }
+            catch (std::exception &e) {
+                ROS_WARN_STREAM_NAMED(this->name, "Open CAN device: " << e.what());
+            }
 
             if(!this->nodeid == dev_node_id) {
                 device=NULL;
