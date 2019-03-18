@@ -45,6 +45,7 @@
     <depend>roscpp</depend>
     <depend>rovi_motor_driver</depend>
     <depend>kacanopen</depend>
+    <depend>can-utils</depend>
 
     <!-- The export tag contains other, unspecified, tags -->
     <export>

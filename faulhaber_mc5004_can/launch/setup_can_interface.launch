@@ -2,7 +2,7 @@
         xsi:noNamespaceSchemaLocation="https://gist.githubusercontent.com/nalt/dfa2abc9d2e3ae4feb82ca5608090387/raw/roslaunch.xsd">
 
         <arg name="ri" default="RI17053"/>
-        <arg name="baudrate" default="1000000" />
+        <arg name="baudrate" default="500000" />
 
         <node name="setup_usbtin_can" pkg="faulhaber_mc5004_can" type="setup_usbtin_can.sh" args="robot/can$(arg ri) $(arg baudrate)" output="screen"/>
 
