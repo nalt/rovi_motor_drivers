@@ -65,4 +65,5 @@ sudo killall slcand
 sudo slcan_attach -f -s$baudrate -nslcan0 -o /dev/$tty_device
 sudo slcand $tty_device slcan0
 sudo ifconfig slcan0 txqueuelen 1000
-sudo ip link set slcan0 up
+sudo ifconfig slcan0 up
+#sudo ip link set slcan0 up
