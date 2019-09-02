@@ -123,6 +123,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
 install(FILES
   launch/setup_can_interface.launch
   scripts/setup_usbtin_can.sh
+  config/605.0121.01-H.eds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
